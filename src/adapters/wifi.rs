@@ -1,7 +1,4 @@
 use core::panic;
-use std::process::Command;
-
-use std::thread;
 use std::time::Duration;
 
 use btleplug::api::BDAddr as mac_address;
@@ -39,6 +36,52 @@ pub enum PhyType {
     VHT,
     HT,
     Legacy, // anything not matching above
+}
+
+// Hidden SSIDs: empty, spaces, or only \xNN escapes
+static RE_HIDDEN: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(?:\\x[0-9A-Fa-f]{2}| )*$").unwrap());
+
+// Fully invalid: only \xNN escapes (no spaces)
+static RE_INVALID: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(?:\\x[0-9A-Fa-f]{2})+$").unwrap());
+
+// Detects any \xNN escape (used for partial-invalid detection)
+static RE_ESCAPE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\x[0-9A-Fa-f]{2}").unwrap());
+
+// Valid UTF-8: at least one printable, no escapes
+static RE_VALID_UTF8: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\x00-\x1F\x7F]").unwrap());
+
+impl WifiBssid {
+    fn parse_ssid(&mut self, raw_ssid: &str) {
+        let ssid = raw_ssid.trim();
+
+        // hidden SSID
+        if RE_HIDDEN.is_match(ssid) {
+            println!("[WiFi] Skipping hidden SSID");
+            self.ssid = None;
+        }
+
+        // fully invalid, pure escapes
+        if RE_INVALID.is_match(ssid) {
+            println!("[WiFi] Skipping invalid SSID: {}", ssid);
+            self.ssid = None;
+        }
+
+        // Contains escapes > partial invalid > clean it
+        if RE_ESCAPE.is_match(ssid) {
+            let cleaned = RE_ESCAPE.replace_all(ssid, "").trim().to_string();
+            if cleaned.is_empty() {
+                panic!("[WiFi] Error: SSID became empty after cleaning: {}", ssid);
+            }
+            self.ssid = Some(cleaned);
+        }
+
+        // no escapes,must be valid UTF-8
+        if RE_VALID_UTF8.is_match(ssid) {
+            self.ssid = Some(ssid.to_string());
+        }
+
+        panic!("[WiFi] SSID did not match any known patterns: {}", ssid);
+    }
 }
 
 pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
@@ -93,7 +136,7 @@ pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
         } else if let Some(bssid) = current_bssid.as_mut() {
             // SSID
             if let Some(caps) = re_ssid.captures(line) {
-                bssid.ssid = parse_ssid(&caps[1]);
+                WifiBssid::parse_ssid(bssid, &caps[1]);
                 continue;
             }
 
@@ -148,48 +191,4 @@ pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
         bssid_records.len()
     );
     bssid_records
-}
-
-// Hidden SSIDs: empty, spaces, or only \xNN escapes
-static RE_HIDDEN: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(?:\\x[0-9A-Fa-f]{2}| )*$").unwrap());
-
-// Fully invalid: only \xNN escapes (no spaces)
-static RE_INVALID: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(?:\\x[0-9A-Fa-f]{2})+$").unwrap());
-
-// Detects any \xNN escape (used for partial-invalid detection)
-static RE_ESCAPE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\x[0-9A-Fa-f]{2}").unwrap());
-
-// Valid UTF-8: at least one printable, no escapes
-static RE_VALID_UTF8: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\x00-\x1F\x7F]").unwrap());
-
-fn parse_ssid(raw_ssid: &str) -> Option<String> {
-    let ssid = raw_ssid.trim();
-
-    // hidden SSID
-    if RE_HIDDEN.is_match(ssid) {
-        println!("[WiFi] Skipping hidden SSID");
-        return None;
-    }
-
-    // fully invalid, pure escapes
-    if RE_INVALID.is_match(ssid) {
-        println!("[WiFi] Skipping invalid SSID: {}", ssid);
-        return None;
-    }
-
-    // Contains escapes > partial invalid > clean it
-    if RE_ESCAPE.is_match(ssid) {
-        let cleaned = RE_ESCAPE.replace_all(ssid, "").trim().to_string();
-        if cleaned.is_empty() {
-            panic!("[WiFi] Error: SSID became empty after cleaning: {}", ssid);
-        }
-        return Some(cleaned);
-    }
-
-    // no escapes,must be valid UTF-8
-    if RE_VALID_UTF8.is_match(ssid) {
-        return Some(ssid.to_string());
-    }
-
-    panic!("[WiFi] SSID did not match any known patterns: {}", ssid);
 }

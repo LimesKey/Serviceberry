@@ -40,13 +40,24 @@ pub struct Position {
 #[derive(Serialize, Debug, Deserialize, Clone)]
 #[allow(non_snake_case)]
 pub struct CellTower {
-    pub radioType: RadioType,   // "gsm", "wcdma", or "lte"
-    pub mobileCountryCode: u16, // MCC
-    pub mobileNetworkCode: u16, // MNC
-    pub locationAreaCode: u32,  // LAC (GSM/WCDMA) or TAC (LTE)
-    pub cellId: u32,            // Cell Identity
-    pub age: Option<u32>,       // ms since last seen
-    pub asu: Option<u8>,        // Arbitrary Strength Unit
+    radioType: Option<RadioType>, // "gsm", "wcdma", or "lte"
+    pub mobileCountryCode: u16,   // MCC
+    pub mobileNetworkCode: u16,   // MNC
+    pub locationAreaCode: u32,    // LAC (GSM/WCDMA) or TAC (LTE)
+    pub cellId: u32,              // Cell Identity
+    pub age: Option<u32>,         // ms since last seen
+    pub asu: Option<u8>,          // Arbitrary Strength Unit
+}
+
+impl CellTower {
+    pub fn set_radio_type(&mut self, radio: &str) {
+        self.radioType = match radio.to_lowercase().as_str() {
+            "gsm" => Some(RadioType::GSM),
+            "wcdma" => Some(RadioType::WCDMA),
+            "lte" => Some(RadioType::LTE),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
@@ -54,6 +65,15 @@ enum RadioType {
     GSM,
     WCDMA,
     LTE,
+}
+
+#[derive(Debug)]
+pub enum SubmitError {
+    Transport(reqwest_middleware::Error),
+    HttpStatus {
+        status: reqwest::StatusCode,
+        body: String,
+    },
 }
 
 pub async fn assemble_geo_payload(gps_pos: PartialPayload) -> Result<items, serde_json::Error> {
@@ -95,12 +115,13 @@ pub async fn assemble_geo_payload(gps_pos: PartialPayload) -> Result<items, serd
 
 // this took horribly long to write, fuck reqwest middleware
 impl items {
-    pub async fn submit_geo_payload(payload: items) -> Result<(), reqwest_middleware::Error> {
+    pub async fn submit_geo_payload(payload: items) -> Result<(), Box<SubmitError>> {
         let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
         let http_client = reqwest::Client::builder()
             .user_agent(APP_USER_AGENT)
             .timeout(std::time::Duration::from_secs(10))
-            .build()?;
+            .build()
+            .map_err(|e| Box::new(SubmitError::Transport(e.into())))?;
 
         // Wrap it in middleware
         let client: ClientWithMiddleware = ClientBuilder::new(http_client.clone())
@@ -111,12 +132,24 @@ impl items {
         // Build the request using reqwest directly
         let req = http_client
             .post(GEOSUBMIT_ENDPOINT)
-            .json(&payload) // 
-            .build()?;
+            .json(&payload) //
+            .build()
+            .map_err(|e| Box::new(SubmitError::Transport(e.into())))?;
 
-        // Execute through middleware
-        let res = client.execute(req).await?;
-        tracing::info!("Geosubmit response status: {}", res.status());
+        let res = client
+            .execute(req)
+            .await
+            .map_err(|e| Box::new(SubmitError::Transport(e)))?;
+
+        let status = res.status();
+        let body = res.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            return Err(Box::new(SubmitError::HttpStatus { status, body }));
+        }
+
+        tracing::info!("Geosubmit response status: {}", status);
+        tracing::info!("Geosubmit response body: {}", body);
 
         Ok(())
     }

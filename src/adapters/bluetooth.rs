@@ -1,9 +1,9 @@
+use btleplug::api::BDAddr as mac_address;
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
 use btleplug::platform::Manager;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time;
-use btleplug::api::BDAddr as mac_address;
 
 use crate::SCAN_DURATION_SECS;
 
@@ -29,7 +29,8 @@ pub async fn fetch_ble_devices() -> Vec<BleDevice> {
     };
 
     let adapters = manager.adapters().await.unwrap_or_default();
-    let adapter = match adapters.into_iter().next() { // check to see if there's at least one bluetooth adapter/card
+    let adapter = match adapters.into_iter().next() {
+        // check to see if there's at least one bluetooth adapter/card
         Some(a) => a,
         None => {
             println!("[BLE] No adapters found");

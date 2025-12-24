@@ -1,9 +1,13 @@
 use axum::{
-    Json, Router, body::Body, http::{Request, StatusCode}, routing::{get, post}
+    Json, Router,
+    body::Body,
+    http::{Request, StatusCode},
+    routing::{get, post},
 };
 use local_ip_address::local_ip;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use tokio::time::timeout;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
@@ -11,7 +15,7 @@ mod adapters;
 mod geosubmit;
 use serde::{Deserialize, Serialize};
 
-use crate::geosubmit::{assemble_geo_payload, items};
+use crate::geosubmit::{SubmitError, assemble_geo_payload, items};
 
 const SCAN_DURATION_SECS: u64 = 10;
 const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
@@ -58,33 +62,35 @@ async fn main() {
         .route("/status", get(handle_status))
         .route("/request", get(handle_request))
         .layer(
-        TraceLayer::new_for_http()
-            .make_span_with(|request: &Request<Body>| {
-                let user_agent = request
-                    .headers()
-                    .get("user-agent")
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("<unknown>");
-                let remote_addr = request
-                    .extensions()
-                    .get::<SocketAddr>()
-                    .map(|sa| sa.ip().to_string())
-                    .unwrap_or_else(|| "<unknown>".into());
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<Body>| {
+                    let user_agent = request
+                        .headers()
+                        .get("user-agent")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("<unknown>");
+                    let remote_addr = request
+                        .extensions()
+                        .get::<SocketAddr>()
+                        .map(|sa| sa.ip().to_string())
+                        .unwrap_or_else(|| "<unknown>".into());
 
-                tracing::info_span!(
-                    "http-request",
-                    method = %request.method(),
-                    uri = %request.uri(),
-                    user_agent = %user_agent,
-                    remote_addr = %remote_addr,
-                )
-            })
-            .on_request(|request: &Request<Body>, _span: &Span| {
-                tracing::info!("started {} {}", request.method(), request.uri().path());
+                    tracing::info_span!(
+                        "http-request",
+                        method = %request.method(),
+                        uri = %request.uri(),
+                        user_agent = %user_agent,
+                        remote_addr = %remote_addr,
+                    )
+                })
+                .on_request(|request: &Request<Body>, _span: &Span| {
+                    tracing::info!("started {} {}", request.method(), request.uri().path());
                 }),
-            );
+        );
 
-    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", port)).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", port))
+        .await
+        .unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -100,18 +106,38 @@ async fn process_submit(Json(payload): Json<serde_json::Value>) -> Result<String
     println!("[Server] /submit request received");
 
     println!("\n================ RECEIVED JSON =================");
-    println!(
-        "{}",
-        &payload
-    );
+    println!("{}", &payload);
     println!("============================================\n");
 
     let gps_response: PartialPayload = serde_json::from_value(payload).unwrap();
-    let response = assemble_geo_payload(gps_response).await.map_err(|_| StatusCode::BAD_REQUEST)?;
+    let response = assemble_geo_payload(gps_response)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    tokio::spawn(async move {
-        items::submit_geo_payload(response.clone()).await;
-    });
+    let handle = tokio::spawn(async move { items::submit_geo_payload(response.clone()).await });
+
+    match timeout(Duration::from_secs(3), handle).await {
+        Ok(join_result) => match join_result {
+            Ok(Ok(())) => {
+                println!("Successfully sent to {}", GEOSUBMIT_ENDPOINT);
+            }
+            Ok(Err(e)) => match *e {
+                SubmitError::HttpStatus { status, ref body } => {
+                    eprintln!("HTTP error {},\n {}", status, body);
+                }
+                SubmitError::Transport(ref err) => {
+                    eprintln!("Transport error: {:?}", err);
+                }
+            },
+            Err(join_err) => {
+                eprintln!("Task panicked: {:?}", join_err);
+            }
+        },
+
+        Err(_) => {
+            tracing::debug!("Request took too long, not waiting for status...");
+        }
+    }
 
     Ok(String::from("Successful")) // add more detailed response later
 }
