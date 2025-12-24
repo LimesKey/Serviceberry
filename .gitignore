@@ -34,3 +34,7 @@ target
 # Temporary / export artifacts
 *.tmp
 *.zip
+
+*.txt
+*.zsh
+*.csv
