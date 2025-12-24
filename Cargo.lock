@@ -3,24 +3,6 @@
 version = 4
 
 [[package]]
-name = "LocationHelper"
-version = "0.1.0"
-dependencies = [
- "axum",
- "btleplug",
- "local-ip-address",
- "mdns-sd",
- "once_cell",
- "regex",
- "serde",
- "serde_json",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,6 +143,8 @@ dependencies = [
  "objc2-core-bluetooth",
  "objc2-foundation",
  "once_cell",
+ "serde",
+ "serde_bytes",
  "static_assertions",
  "thiserror 2.0.17",
  "tokio",
@@ -993,6 +977,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1046,6 +1040,24 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "service_berry"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "btleplug",
+ "local-ip-address",
+ "mdns-sd",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1354,6 +1366,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 

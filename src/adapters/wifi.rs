@@ -7,20 +7,27 @@ use std::time::Duration;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
+use btleplug::api::BDAddr as mac_address;
+
+use crate::SCAN_DURATION_SECS;
 
 // oh my gosh I wrote all this code before discovering:
 // "Do NOT screenscrape this tool, we don't consider its output stable."
 
-static SCAN_TIME: u64 = 10; // seconds to wait for scan to complete
-
 #[derive(Serialize, Debug, Clone)]
 pub struct WifiBssid {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ssid: Option<String>,
-    pub bssid: String,    // a mac adddress for a specific SSID
+    #[serde(rename = "macAddress")]
+    pub bssid: mac_address,    // a mac adddress for a specific SSID
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub age: Option<u64>, // in milliseconds since last seen
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub channel: Option<u8>,
     pub frequency: u16, // in MHz
+    #[serde(rename = "radioType")]
     pub phy: PhyType,   // physcial layer type, usually correlated with wifi versioning
+    #[serde(rename = "signalStrength")]
     pub rssi: i32,      // Signal Strength, in dBm
 }
 
@@ -41,7 +48,7 @@ pub fn fetch_wifi_stats() -> Vec<WifiBssid> {
         .output()
         .expect("[WiFi] Failed to trigger scan - Is IW installed?"); // Wait 10 seconds for scan to complete 
 
-    thread::sleep(Duration::from_secs(SCAN_TIME)); // Dump the scan results 
+    thread::sleep(Duration::from_secs(SCAN_DURATION_SECS)); // Dump the scan results 
     let output = Command::new("sudo")
         .args(&["iw", "dev", "wlan0", "scan", "dump"])
         .output()
@@ -74,7 +81,7 @@ pub fn fetch_wifi_stats() -> Vec<WifiBssid> {
 
             current_bssid = Some(WifiBssid {
                 ssid: None,
-                bssid: caps[1].to_string(),
+                bssid: caps[1].parse().unwrap_or_default(),
                 age: None,
                 channel: None,
                 frequency: 0,
