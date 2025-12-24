@@ -1,13 +1,13 @@
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
 use btleplug::platform::Manager;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time;
 use btleplug::api::BDAddr as mac_address;
 
 use crate::SCAN_DURATION_SECS;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Deserialize, Clone)]
 pub struct BleDevice {
     #[serde(rename = "macAddress")]
     pub mac_address: mac_address,

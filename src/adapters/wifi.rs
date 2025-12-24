@@ -4,34 +4,34 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
+use btleplug::api::BDAddr as mac_address;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serde::Serialize;
-use btleplug::api::BDAddr as mac_address;
+use serde::{Deserialize, Serialize};
 
 use crate::SCAN_DURATION_SECS;
 
 // oh my gosh I wrote all this code before discovering:
 // "Do NOT screenscrape this tool, we don't consider its output stable."
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct WifiBssid {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ssid: Option<String>,
     #[serde(rename = "macAddress")]
-    pub bssid: mac_address,    // a mac adddress for a specific SSID
+    pub bssid: mac_address, // a mac adddress for a specific SSID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub age: Option<u64>, // in milliseconds since last seen
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channel: Option<u8>,
     pub frequency: u16, // in MHz
     #[serde(rename = "radioType")]
-    pub phy: PhyType,   // physcial layer type, usually correlated with wifi versioning
+    pub phy: PhyType, // physcial layer type, usually correlated with wifi versioning
     #[serde(rename = "signalStrength")]
-    pub rssi: i32,      // Signal Strength, in dBm
+    pub rssi: i32, // Signal Strength, in dBm
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub enum PhyType {
     UHR,
     EHT,
@@ -41,17 +41,19 @@ pub enum PhyType {
     Legacy, // anything not matching above
 }
 
-pub fn fetch_wifi_stats() -> Vec<WifiBssid> {
+pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
     println!("[WiFi] Running scan...");
-    let _ = Command::new("sudo")
+    let _ = tokio::process::Command::new("sudo")
         .args(&["iw", "dev", "wlan0", "scan", "trigger"])
         .output()
+        .await
         .expect("[WiFi] Failed to trigger scan - Is IW installed?"); // Wait 10 seconds for scan to complete 
 
-    thread::sleep(Duration::from_secs(SCAN_DURATION_SECS)); // Dump the scan results 
-    let output = Command::new("sudo")
+    tokio::time::sleep(Duration::from_secs(SCAN_DURATION_SECS)).await; // Dump the scan results 
+    let output = tokio::process::Command::new("sudo")
         .args(&["iw", "dev", "wlan0", "scan", "dump"])
         .output()
+        .await
         .expect("[WiFi] Failed to dump scan results");
     let stdout = String::from_utf8_lossy(&output.stdout);
 

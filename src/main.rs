@@ -1,61 +1,20 @@
 use axum::{
-    Router,
-    body::Body,
-    http::Request,
-    Json,
-    routing::{get, post},
+    Json, Router, body::Body, http::{Request, StatusCode}, routing::{get, post}
 };
 use local_ip_address::local_ip;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use serde::Serialize;
 use std::{collections::HashMap, net::SocketAddr};
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
 mod adapters;
-use adapters::bluetooth::{BleBeacon, fetch_ble_beacons};
-use adapters::wifi::{WifiBssid, fetch_wifi_stats};
-use std::time::{SystemTime, UNIX_EPOCH};
+mod geosubmit;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Debug)]
-#[allow(non_snake_case)]
-struct Position {
-    latitude: f64,
-    longitude: f64,
-    accuracy: f64,
-    altitude: f64,
-    altitudeAccuracy: f64,
-    heading: f64,
-    speed: f64,
-    source: String,
-}
+use crate::geosubmit::{assemble_geo_payload, items};
 
-#[derive(Serialize, Debug)]
-#[allow(non_snake_case)]
-struct GeoItem {
-    timestamp: u128,
-    position: Position,
-    wifiAccessPoints: Vec<WifiBssid>,
-    bluetoothBeacons: Vec<BleBeacon>,
-}
-
-#[derive(Serialize, Debug)]
-struct GeoPayload {
-    items: Vec<GeoItem>,
-}
-
-fn get_position() -> Position {
-    Position {
-        latitude: 43.731425,
-        longitude: -79.607407,
-        accuracy: 10.0,
-        altitude: 170.0,
-        altitudeAccuracy: 0.0,
-        heading: 0.0,
-        speed: 0.0,
-        source: String::from("gps"),
-    }
-}
+const SCAN_DURATION_SECS: u64 = 10;
+const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
 
 #[tokio::main]
 async fn main() {
@@ -95,7 +54,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
-        .route("/submit", post(handle_submit))
+        .route("/submit", post(process_submit))
         .route("/status", get(handle_status))
         .route("/request", get(handle_request))
         .layer(
@@ -127,77 +86,40 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", port)).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-
-    // let submissions = warp::path!("/submit").and_then(|| async {
-    //     //
-    //     println!("[Server] Request received");
-
-    //     let wifi = fetch_wifi_stats();
-    //     let ble = fetch_ble_beacons().await;
-    //     let position = get_position();
-
-    //     let payload = GeoPayload {
-    //         items: vec![GeoItem {
-    //             timestamp: SystemTime::now()
-    //                 .duration_since(UNIX_EPOCH)
-    //                 .unwrap()
-    //                 .as_millis(),
-    //             position,
-    //             wifiAccessPoints: wifi,
-    //             bluetoothBeacons: ble,
-    //         }],
-    //     };
-
-    //     let json = serde_json::to_string_pretty(&payload).unwrap();
-
-    //     println!("\n================ FINAL JSON =================");
-    //     println!("{}", json);
-    //     println!("============================================\n");
-
-    //     Ok::<_, warp::Rejection>(warp::reply::with_header(
-    //         json,
-    //         CONTENT_TYPE,
-    //         "application/json",
-    //     ))
-    // });
-
-    // let status = warp::path!("status").and_then(|| async {
-    //     println!("[Server] /status request received");
-    //     Ok::<_, warp::Rejection>("Server is running".to_string())
-    // });
-
-    // println!(
-    //     "[Server] Running at http://{}:{}/network_json",
-    //     lan_ip, port
-    // );
-
-    // warp::serve(submissions.or(status))
-    //     .run(([0, 0, 0, 0], port))
-    //     .await;
 }
 
-async fn handle_submit() {}
-
-async fn handle_status() -> &'static str {
-    "Server is running"
+#[derive(Serialize, Deserialize)]
+pub struct PartialPayload {
+    position: serde_json::Value,
+    cell_towers: Option<serde_json::Value>,
+    #[serde(flatten)]
+    extra: HashMap<String, serde_json::Value>,
 }
 
-async fn handle_request() -> Json<GeoPayload> {
-    let wifi = fetch_wifi_stats();
-    let ble = fetch_ble_beacons().await;
-    let position = get_position();
+async fn process_submit(Json(payload): Json<serde_json::Value>) -> Result<String, StatusCode> {
+    println!("[Server] /submit request received");
 
-    let payload = GeoPayload {
-        items: vec![GeoItem {
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis(),
-            position,
-            wifiAccessPoints: wifi,
-            bluetoothBeacons: ble,
-        }],
-    };
+    println!("\n================ RECEIVED JSON =================");
+    println!(
+        "{}",
+        &payload
+    );
+    println!("============================================\n");
 
-    Json(payload)
+    let gps_response: PartialPayload = serde_json::from_value(payload).unwrap();
+    let response = assemble_geo_payload(gps_response).await.map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    tokio::spawn(async move {
+        items::submit_geo_payload(response.clone()).await;
+    });
+
+    Ok(String::from("Successful")) // add more detailed response later
+}
+
+async fn handle_status() -> Result<String, StatusCode> {
+    Ok(String::from("todo")) // add more detailed response later
+}
+
+async fn handle_request() -> Result<String, StatusCode> {
+    Ok(String::from("todo")) // add more detailed response later
 }
