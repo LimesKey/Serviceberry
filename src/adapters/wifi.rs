@@ -30,11 +30,11 @@ pub struct WifiBssid {
 
 #[derive(Serialize, Debug, Clone, Deserialize)]
 pub enum PhyType {
-    UHR,
-    EHT,
-    HE,
-    VHT,
-    HT,
+    Uhr,
+    Eht,
+    He,
+    Vht,
+    Ht,
     Legacy, // anything not matching above
 }
 
@@ -87,14 +87,14 @@ impl WifiBssid {
 pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
     println!("[WiFi] Running scan...");
     let _ = tokio::process::Command::new("sudo")
-        .args(&["iw", "dev", "wlan0", "scan", "trigger"])
+        .args(["iw", "dev", "wlan0", "scan", "trigger"])
         .output()
         .await
         .expect("[WiFi] Failed to trigger scan - Is IW installed?"); // Wait 10 seconds for scan to complete 
 
     tokio::time::sleep(Duration::from_secs(SCAN_DURATION_SECS)).await; // Dump the scan results 
     let output = tokio::process::Command::new("sudo")
-        .args(&["iw", "dev", "wlan0", "scan", "dump"])
+        .args(["iw", "dev", "wlan0", "scan", "dump"])
         .output()
         .await
         .expect("[WiFi] Failed to dump scan results");
@@ -167,15 +167,15 @@ pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
 
             // PHY type detection
             bssid.phy = if re_uhr_caps.is_match(line) {
-                PhyType::UHR
+                PhyType::Uhr
             } else if re_eht_caps.is_match(line) {
-                PhyType::EHT
+                PhyType::Eht
             } else if re_he_caps.is_match(line) {
-                PhyType::HE
+                PhyType::He
             } else if re_vht_caps.is_match(line) {
-                PhyType::VHT
+                PhyType::Vht
             } else if re_ht_caps.is_match(line) {
-                PhyType::HT
+                PhyType::Ht
             } else {
                 PhyType::Legacy
             };

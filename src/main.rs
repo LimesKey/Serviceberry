@@ -38,7 +38,7 @@ async fn main() {
         &format!("_{}._tcp.local.", service_type),
         instance_name,
         &format!("{}.local.", hostname),
-        &lan_ip.to_string(),
+        lan_ip.to_string(),
         port,
         Some(properties),
     )

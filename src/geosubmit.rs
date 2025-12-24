@@ -49,12 +49,13 @@ pub struct CellTower {
     pub asu: Option<u8>,          // Arbitrary Strength Unit
 }
 
+#[allow(dead_code)]
 impl CellTower {
     pub fn set_radio_type(&mut self, radio: &str) {
         self.radioType = match radio.to_lowercase().as_str() {
-            "gsm" => Some(RadioType::GSM),
-            "wcdma" => Some(RadioType::WCDMA),
-            "lte" => Some(RadioType::LTE),
+            "gsm" => Some(RadioType::Gsm),
+            "wcdma" => Some(RadioType::Wcdma),
+            "lte" => Some(RadioType::Lte),
             _ => None,
         }
     }
@@ -62,9 +63,9 @@ impl CellTower {
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
 enum RadioType {
-    GSM,
-    WCDMA,
-    LTE,
+    Gsm,
+    Wcdma,
+    Lte,
 }
 
 #[derive(Debug)]
