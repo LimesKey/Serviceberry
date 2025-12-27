@@ -1,3 +1,8 @@
+//! BLE GATT service setup and peripheral functionality
+//!
+//! Configures and runs a Bluetooth Low Energy peripheral with a GATT service
+//! that allows read/write operations and notifications.
+
 use std::io::{self, BufRead};
 use tokio::{sync::mpsc, task};
 use tracing::{error, info};
@@ -18,6 +23,7 @@ use ble_peripheral_rust::{
     uuid::ShortUuid,
 };
 
+/// Start the BLE peripheral and handle GATT operations
 pub async fn ble_peripheral(line_rx: mpsc::UnboundedReceiver<String>) {
     // UUIDs for service and characteristic
     let service_uuid = Uuid::from_short(0x1234_u16);

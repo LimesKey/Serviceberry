@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::SCAN_DURATION_SECS;
+use crate::config::SCAN_DURATION_SECS;
 
 // oh my gosh I wrote all this code before discovering:
 // "Do NOT screenscrape this tool, we don't consider its output stable."

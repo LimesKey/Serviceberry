@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time;
 
-use crate::SCAN_DURATION_SECS;
+use crate::config::SCAN_DURATION_SECS;
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
 pub struct BleDevice {
