@@ -4,7 +4,7 @@ use mdns_sd::{ServiceDaemon, ServiceInfo};
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use crate::config::{MDNS_SERVICE_TYPE, HTTP_SERVER_PORT};
+use crate::config::{HTTP_SERVER_PORT, MDNS_SERVICE_TYPE};
 
 /// Register the mDNS service
 pub fn register_mdns_service(
@@ -18,7 +18,10 @@ pub fn register_mdns_service(
     let properties = HashMap::from([
         ("version".into(), version.into()),
         ("paths".into(), "/submit, /status, /request".into()),
-        ("cert_fingerprint".into(), hex::encode(cert_fingerprint).into()),
+        (
+            "cert_fingerprint".into(),
+            hex::encode(cert_fingerprint).into(),
+        ),
     ]);
 
     let url = String::from("serviceberry.local.");
@@ -26,7 +29,7 @@ pub fn register_mdns_service(
     let service_info: ServiceInfo = ServiceInfo::new(
         &service_type, // Service you're running, ServiceBerry in this case
         instance_name, // pretty, human readable name for the device you're using
-        &url, // actual mDNS url name you're broadcasting as / second level domain
+        &url,          // actual mDNS url name you're broadcasting as / second level domain
         lan_ip.to_string(),
         HTTP_SERVER_PORT,
         Some(properties),
