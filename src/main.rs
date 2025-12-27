@@ -4,9 +4,10 @@ use axum::{
     http::{Request, StatusCode},
     routing::{get, post},
 };
+use directories::ProjectDirs;
 use local_ip_address::local_ip;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, fs, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::time::timeout;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
@@ -16,19 +17,34 @@ mod geosubmit;
 mod server;
 use serde::{Deserialize, Serialize};
 
-use crate::geosubmit::{SubmitError, assemble_geo_payload, items};
-use crate::server::bluetooth::ble_peripheral;
+use geosubmit::{SubmitError, assemble_geo_payload, items};
+use server::bluetooth::ble_peripheral;
+use server::wifi::gen_cert;
 
 const SCAN_DURATION_SECS: u64 = 10;
 const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
 
+#[derive(Serialize, Deserialize)]
+pub struct PartialPayload {
+    position: serde_json::Value,
+    cell_towers: Option<serde_json::Value>,
+    #[serde(flatten)]
+    extra: HashMap<String, serde_json::Value>,
+}
+
 #[tokio::main]
 async fn main() {
+    let system_hostname = hostname::get()
+        .unwrap_or("turtle".into()) // if the hostname isn't set or cannot be retrieved, default to "turtle"
+        .to_string_lossy()
+        .to_string();
     let version = env!("CARGO_PKG_VERSION");
+
+
 
     let service_type = "Serviceberry".to_lowercase(); // Service your running, ServiceBerry in this case
     let instance_name = "Home Server"; // pretty, human readable name for the device you're using
-    let hostname = "limeskey"; // actual mDNS url name you're broadcasting as / second level domain
+    let hostname = system_hostname; // actual mDNS url name you're broadcasting as / second level domain, currently using system hostname
     let lan_ip = local_ip().expect("Could not get local IP address");
     let port = 8080;
     let properties = HashMap::from([
@@ -103,14 +119,6 @@ async fn main() {
         .await
         .unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct PartialPayload {
-    position: serde_json::Value,
-    cell_towers: Option<serde_json::Value>,
-    #[serde(flatten)]
-    extra: HashMap<String, serde_json::Value>,
 }
 
 async fn process_submit(Json(payload): Json<serde_json::Value>) -> Result<String, StatusCode> {
