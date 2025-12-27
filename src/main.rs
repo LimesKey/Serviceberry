@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     tracing_subscriber::fmt::init();
 
-    // Get system info
+    // get system info
     let hostname = hostname::get()
         .unwrap_or_else(|_| config::DEFAULT_HOSTNAME.into())
         .to_string_lossy()

@@ -1,8 +1,3 @@
-//! ServiceBerry - Location service with WiFi & BLE scanning
-//!
-//! A Rust application that scans nearby WiFi and Bluetooth devices
-//! and submits location data to the Ichnaea geolocation service.
-
 pub mod config;
 pub mod error;
 

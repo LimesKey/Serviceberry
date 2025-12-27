@@ -39,3 +39,6 @@ After installing packages, enable and start the necessary system services:
 sudo systemctl enable --now bluetooth
 sudo systemctl enable --now avahi-daemon
 ```
+
+## Contributing
+Ensure you have the latest verison of [Rust](https://rust-lang.org/tools/install/) installed and have installed all the necessary system packages.

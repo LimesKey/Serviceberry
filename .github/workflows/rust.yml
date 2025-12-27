@@ -28,7 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          components: rust-src # Optional, helpful for some builds
+          components: rust-src
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
