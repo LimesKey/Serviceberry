@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Debug, Deserialize, Clone)]
 #[allow(nonstandard_style)]
 pub struct items {
-    pub timestamp: u128, /// Timestamp in milliseconds since Unix epoch
+    pub timestamp: u128,
+    /// Timestamp in milliseconds since Unix epoch
     pub position: Position,
     pub bluetoothBeacons: Vec<crate::scanner::BleDevice>,
     pub wifiAccessPoints: Vec<crate::scanner::WifiBssid>,

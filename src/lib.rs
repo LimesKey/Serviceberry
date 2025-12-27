@@ -6,34 +6,28 @@
 pub mod config;
 pub mod error;
 
-// Scanner module with submodules
 pub mod scanner {
     pub mod bluetooth;
     pub mod wifi;
 
-    // Re-export commonly used types
     pub use self::bluetooth::BleDevice;
     pub use self::wifi::WifiBssid;
 }
 
-// Geosubmit module with submodules
 pub mod geosubmit {
     pub mod client;
     pub mod payload;
 
-    // Re-export commonly used types and functions
     pub use self::client::{assemble_geo_payload, submit_geo_payload};
     pub use self::payload::{CellTower, Position, RadioType, items};
 }
 
-// Peripheral module
 pub mod peripheral {
     pub mod gatt;
 
     pub use self::gatt::ble_peripheral;
 }
 
-// Server module with submodules
 pub mod server {
     pub mod handlers;
     pub mod mdns_service;
@@ -53,7 +47,7 @@ pub mod server {
 
     pub fn create_router() -> Router {
         Router::new()
-            .route("/submit", post(handlers::process_submit))
+            .route("/submit", post(handlers::process_submit_http))
             .route("/status", get(handlers::handle_status))
             .route("/request", get(handlers::handle_request))
             .layer(

@@ -1,70 +1,62 @@
-//! HTTP request handlers for server endpoints
-
-use axum::{Json, http::StatusCode};
+use axum::http::StatusCode;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Duration;
 use tokio::time::timeout;
-use serde::Deserialize;
-use std::collections::HashMap;
+use tracing::{error, info};
 
 use crate::geosubmit::{self, items};
 
-/// Partial payload from client
-#[derive(Deserialize)]
-pub struct PartialPayload { // incoming json structure from client (mobile) device 
-    pub position: serde_json::Value, // requires
-    pub cell_towers: Option<serde_json::Value>, // optional
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct PartialPayload {
+    pub position: serde_json::Value,
+    pub cell_towers: Option<serde_json::Value>,
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>, // catch-all for any other fields
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
-/// Handle /submit endpoint
-pub async fn process_submit(
-    Json(payload): Json<serde_json::Value>,
-) -> Result<String, StatusCode> {
-    println!("[Server] /submit request received");
+pub async fn process_submit_http(
+    axum::Json(value): axum::Json<serde_json::Value>,
+) -> Result<String, crate::error::Error> {
+    let payload: PartialPayload = serde_json::from_value(value)
+        .map_err(|e| crate::error::Error::Other(format!("JSON Parse Error: {}", e)))?;
 
-    println!("\n================ RECEIVED JSON =================");
-    println!("{}", &payload);
-    println!("============================================\n");
+    process_submit(payload).await
+}
 
-    let gps_response: PartialPayload = serde_json::from_value(payload)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+pub async fn process_submit(payload: PartialPayload) -> Result<String, crate::error::Error> {
+    info!("[Server] Processing submission...");
 
-    let response: items = geosubmit::assemble_geo_payload(gps_response.position, gps_response.cell_towers)
+    let geo_items: items = geosubmit::assemble_geo_payload(payload.position, payload.cell_towers)
         .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+        .map_err(|e| crate::error::Error::Other(format!("Assembly Error: {}", e)))?;
 
-    let handle = tokio::spawn(async move {
-        geosubmit::submit_geo_payload(response.clone()).await
-    });
+    let handle = tokio::spawn(async move { geosubmit::submit_geo_payload(geo_items).await });
 
     match timeout(Duration::from_secs(3), handle).await {
         Ok(join_result) => match join_result {
             Ok(Ok(())) => {
-                println!("Successfully sent geolocation data");
+                info!("Successfully sent geolocation data to service");
             }
             Ok(Err(e)) => {
-                eprintln!("Geosubmit error: {}", e);
+                error!("Geosubmit network error: {}", e);
             }
             Err(join_err) => {
-                eprintln!("Task panicked: {:?}", join_err);
+                error!("Submission task panicked: {:?}", join_err);
             }
         },
-
         Err(_) => {
-            tracing::debug!("Request took too long, not waiting for status...");
+            info!("Submission taking longer than 3s; continuing in background.");
         }
     }
 
     Ok(String::from("Successful"))
 }
 
-/// Handle /status endpoint
-pub async fn handle_status() -> Result<String, StatusCode> {
-    Ok(String::from("ok"))
+pub async fn handle_status() -> (StatusCode, String) {
+    (StatusCode::OK, "ok".to_string())
 }
 
-/// Handle /request endpoint
-pub async fn handle_request() -> Result<String, StatusCode> {
-    Ok(String::from("ok"))
+pub async fn handle_request() -> (StatusCode, String) {
+    (StatusCode::OK, "ok".to_string())
 }

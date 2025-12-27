@@ -1,30 +1,34 @@
-//! Crate-wide error types
-
 use std::fmt;
 
-/// Top-level error type for the crate
+use axum::{
+    Json,
+    response::{IntoResponse, Response},
+};
+use hyper::StatusCode;
+use serde_json::json;
+
 #[derive(Debug)]
 pub enum Error {
     // Scanner errors
     BleAdapter(String),
     WifiScan(String),
     InvalidSsid(String),
-    
+
     // Geosubmit errors
     Transport(String),
     HttpStatus { status: u16, body: String },
     Serialization(String),
-    
+
     // Server errors
     Bind(String),
-    
+
     // Config errors
     Config(String),
-    
+
     // IO and serialization
     Io(std::io::Error),
     Json(serde_json::Error),
-    
+
     // Other errors
     Other(String),
 }
@@ -63,3 +67,27 @@ impl From<serde_json::Error> for Error {
 
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            Error::Other(ref msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            Error::Bind(ref msg) => (StatusCode::BAD_REQUEST, msg),
+            Error::BleAdapter(_) => todo!(),
+            Error::WifiScan(_) => todo!(),
+            Error::InvalidSsid(_) => todo!(),
+            Error::Transport(_) => todo!(),
+            Error::HttpStatus { status, body } => todo!(),
+            Error::Serialization(_) => todo!(),
+            Error::Config(_) => todo!(),
+            Error::Io(error) => todo!(),
+            Error::Json(error) => todo!(),
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+        }));
+
+        (status, body).into_response()
+    }
+}

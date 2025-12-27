@@ -1,13 +1,12 @@
 # Serviceberry
-Serviceberry started as a project to improve the accuracy & coverage of geolocation databases, it does this by submitting anonyomous sensor & location data to a configured geolocation service. Serviceberry is designed to run on your mobile IOS device, while running a desktop app on either a local computer or laptop, using either Bluetooth or LAN connectivity. 
+Serviceberry started as a project to improve the accuracy & coverage of geolocation databases, it does this by submitting anonyomous sensor & location data to a configured geolocation service. Serviceberry is designed to run on your mobile IOS device, while running as a desktop app on a local computer or laptop, using either Bluetooth or Wifi connectivity. 
 
 Currently, Serviceberry is only guaranteed to support [BeaconDB](https://beacondb.net/) and Linux machines. See the todo for the progress.
 
 ##  TODO
-
+*   [x] Add TLS encryption
 *   [ ] Add support for Bluetooth connectivity
 *   [ ] Create IOS Mobile App
-*   [x] Add TLS encryption
 *   [ ] Build Tauri desktop app
 *   [ ] Test support for other geolocation databases
 

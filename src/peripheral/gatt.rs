@@ -1,11 +1,8 @@
-//! BLE GATT service setup and peripheral functionality
-//!
-//! Configures and runs a Bluetooth Low Energy peripheral with a GATT service
-//! that allows read/write operations and notifications.
+use std::sync::Arc;
 
-use std::io::{self, BufRead};
-use tokio::{sync::mpsc, task};
-use tracing::{error, info};
+use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{Mutex, mpsc};
+use tracing::info;
 use uuid::Uuid;
 
 use ble_peripheral_rust::PeripheralImpl;
@@ -14,25 +11,23 @@ use ble_peripheral_rust::{
     gatt::{
         characteristic::Characteristic,
         descriptor::Descriptor,
-        peripheral_event::{
-            PeripheralEvent, ReadRequestResponse, RequestResponse, WriteRequestResponse,
-        },
+        peripheral_event::{PeripheralEvent, RequestResponse, WriteRequestResponse},
         properties::{AttributePermission, CharacteristicProperty},
         service::Service,
     },
     uuid::ShortUuid,
 };
 
-/// Start the BLE peripheral and handle GATT operations
-pub async fn ble_peripheral(line_rx: mpsc::UnboundedReceiver<String>) {
-    // UUIDs for service and characteristic
-    let service_uuid = Uuid::from_short(0x1234_u16);
-    let char_uuid = Uuid::from_short(0x2A3D_u16);
+use crate::server::handlers::PartialPayload;
 
-    // Shared characteristic value
-    let char_value = std::sync::Arc::new(tokio::sync::Mutex::new(b"Hello iOS".to_vec()));
+pub async fn ble_peripheral(payload_tx: UnboundedSender<PartialPayload>) {
+    let service_uuid =
+        Uuid::parse_str("12345678-1234-5678-1234-56789abcdef0").expect("invalid service UUID");
+    let char_uuid =
+        Uuid::parse_str("abcdef01-1234-5678-1234-56789abcdef0").expect("invalid char UUID");
 
-    // GATT service definition
+    let char_value = Arc::new(Mutex::new(b"Hello iOS".to_vec()));
+
     let service = Service {
         uuid: service_uuid,
         primary: true,
@@ -56,104 +51,79 @@ pub async fn ble_peripheral(line_rx: mpsc::UnboundedReceiver<String>) {
         }],
     };
 
-    // Channels for BLE events
-    let (event_tx, mut event_rx): (
-        mpsc::Sender<PeripheralEvent>,
-        mpsc::Receiver<PeripheralEvent>,
-    ) = mpsc::channel(256);
-
-    // Create peripheral
-    let mut peripheral = Peripheral::new(event_tx).await.unwrap();
-
-    // Add service
-    peripheral.add_service(&service).await.unwrap();
-
-    // Start advertising
-    info!("Advertising as Serviceberry...");
-    peripheral
-        .start_advertising("Serviceberry", &[service.uuid])
+    let (event_tx, mut event_rx) = mpsc::channel::<PeripheralEvent>(256);
+    let mut peripheral = Peripheral::new(event_tx)
         .await
-        .unwrap();
+        .expect("failed to create peripheral");
+    peripheral
+        .add_service(&service)
+        .await
+        .expect("failed to add service");
 
-    // Spawn task to handle BLE events
-    let char_value_clone = char_value.clone();
-    tokio::spawn(async move {
-        while let Some(event) = event_rx.recv().await {
-            match event {
-                PeripheralEvent::ReadRequest { responder, .. } => {
-                    let value = char_value_clone.lock().await.clone();
-                    responder
-                        .send(ReadRequestResponse {
-                            value,
-                            response: RequestResponse::Success,
-                        })
-                        .unwrap();
+    let mut write_buffer = Vec::new();
+    let char_value_loop = Arc::clone(&char_value);
+
+    info!("Advertising as Serviceberry...");
+    let _ = peripheral
+        .start_advertising("Serviceberry", &[service_uuid])
+        .await;
+
+    while let Some(event) = event_rx.recv().await {
+        match event {
+            PeripheralEvent::ReadRequest { responder, .. } => {
+                let data = char_value_loop.lock().await;
+                let _ = responder.send(
+                    ble_peripheral_rust::gatt::peripheral_event::ReadRequestResponse {
+                        value: data.clone(),
+                        response: RequestResponse::Success,
+                    },
+                );
+            }
+
+            PeripheralEvent::WriteRequest {
+                value, responder, ..
+            } => {
+                let _ = responder.send(WriteRequestResponse {
+                    response: RequestResponse::Success,
+                });
+
+                {
+                    let mut data = char_value_loop.lock().await;
+                    *data = value.clone();
                 }
-                PeripheralEvent::WriteRequest {
-                    value, responder, ..
-                } => {
-                    {
-                        let mut v = char_value_clone.lock().await;
-                        *v = value.clone();
+
+                write_buffer.extend_from_slice(&value);
+
+                if let Ok(text) = String::from_utf8(write_buffer.clone()) {
+                    let mut success = false;
+
+                    if text.contains('\n') {
+                        for line in text.lines() {
+                            if let Ok(payload) = serde_json::from_str::<PartialPayload>(line) {
+                                let _ = payload_tx.send(payload);
+                                success = true;
+                            }
+                        }
+                    } else if let Ok(payload) = serde_json::from_str::<PartialPayload>(&text) {
+                        let _ = payload_tx.send(payload);
+                        success = true;
                     }
-                    responder
-                        .send(WriteRequestResponse {
-                            response: RequestResponse::Success,
-                        })
-                        .unwrap();
-                    info!("Characteristic updated via write: {:?}", value);
-                }
-                PeripheralEvent::CharacteristicSubscriptionUpdate {
-                    request,
-                    subscribed,
-                } => {
-                    info!("Subscription update: subscribed={subscribed:?}, request={request:?}");
-                }
-                _ => {}
-            }
-        }
-    });
 
-    // Optional: spawn task to read from stdin
-    let (line_tx, mut line_rx_stdin): (
-        mpsc::UnboundedSender<String>,
-        mpsc::UnboundedReceiver<String>,
-    ) = mpsc::unbounded_channel();
-    let line_tx_clone = line_tx.clone();
-    task::spawn_blocking(move || {
-        let stdin = io::stdin();
-        for line in stdin.lock().lines() {
-            if let Ok(input) = line {
-                if line_tx_clone.send(input).is_err() {
-                    break;
+                    if success {
+                        write_buffer.clear();
+                    }
+                }
+
+                if write_buffer.len() > 2048 {
+                    write_buffer.clear();
                 }
             }
-        }
-    });
 
-    // Forward external line_rx into internal line_rx_stdin
-    let mut line_rx = line_rx;
-    tokio::spawn(async move {
-        while let Some(line) = line_rx.recv().await {
-            if line_tx.send(line).is_err() {
-                error!("Failed to forward line to internal channel");
+            _ => {
+                let _ = peripheral
+                    .start_advertising("Serviceberry", &[service_uuid])
+                    .await;
             }
-        }
-    });
-
-    // Update characteristic with input from stdin or external channel
-    while let Some(input) = line_rx_stdin.recv().await {
-        info!("Writing '{input}' to characteristic {char_uuid}");
-        {
-            let mut v = char_value.lock().await;
-            *v = input.clone().into_bytes();
-        }
-        if let Err(err) = peripheral
-            .update_characteristic(char_uuid, input.into_bytes())
-            .await
-        {
-            error!("Error updating characteristic: {}", err);
-            break;
         }
     }
 }

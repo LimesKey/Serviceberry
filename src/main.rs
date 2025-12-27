@@ -34,14 +34,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .map_err(|e| format!("Failed to register mDNS: {}", e))?;
 
-    // // Start BLE peripheral in background
-    // let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<server::handlers::PartialPayload>();
 
-    // tokio::spawn(async move {
-    //     peripheral::ble_peripheral(rx).await;
-    // });
+    // Start the BLE peripheral
+    tokio::spawn(async move {
+        peripheral::ble_peripheral(tx).await;
+    });
 
-    // tx.send("Hello iOS".to_string()).ok();
+    // Start the Worker
+    tokio::spawn(async move {
+        while let Some(payload) = rx.recv().await {
+            tracing::info!("Worker received payload from BLE: {:?}", payload);
+            // This is where you call your submission logic
+            if let Err(e) = server::handlers::process_submit(payload).await {
+                tracing::error!("Failed to process BLE submission: {:?}", e);
+            }
+        }
+    });
 
     // Start HTTP server
     server::start_tls(identity).await?;
