@@ -10,11 +10,11 @@ use crate::geosubmit::{self, items};
 
 /// Partial payload from client
 #[derive(Deserialize)]
-pub struct PartialPayload {
-    pub position: serde_json::Value,
-    pub cell_towers: Option<serde_json::Value>,
+pub struct PartialPayload { // incoming json structure from client (mobile) device 
+    pub position: serde_json::Value, // requires
+    pub cell_towers: Option<serde_json::Value>, // optional
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    pub extra: HashMap<String, serde_json::Value>, // catch-all for any other fields
 }
 
 /// Handle /submit endpoint
