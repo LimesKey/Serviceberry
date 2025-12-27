@@ -23,9 +23,9 @@ pub fn register_mdns_service(
         ),
     ]);
 
-    let hostname = format!("serviceberry-{}.local", username.to_lowercase());
+    let hostname = format!("serviceberry-{}.local.", username.to_lowercase());
 
-    tracing::info!("Registering mDNS service '{}'", instance_name);
+    tracing::info!("Registering mDNS service '{}'", service_type);
     tracing::debug!("Service type: {}", service_type);
     tracing::debug!("Hostname: {}", hostname);
     tracing::debug!("LAN IP: {}", lan_ip);
@@ -47,7 +47,7 @@ pub fn register_mdns_service(
     tracing::info!(
         "mDNS service '{}' successfully published at {}:{}",
         instance_name,
-        hostname,
+        hostname.trim_end_matches('.'),
         HTTP_SERVER_PORT
     );
 
