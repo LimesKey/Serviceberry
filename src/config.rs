@@ -11,7 +11,6 @@ pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARG
 pub const MDNS_SERVICE_TYPE: &str = "Serviceberry";
 pub const HTTP_SERVER_PORT: u16 = 8080;
 pub const DEFAULT_HOSTNAME: &str = "turtle";
-pub const MDNS_INSTANCE_NAME: &str = "Home Server";
 
 /// Get the project configuration directory
 pub fn config_dir() -> PathBuf {
