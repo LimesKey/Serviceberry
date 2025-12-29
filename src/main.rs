@@ -4,7 +4,11 @@
 //! location data to the Ichnaea geolocation service.
 
 use local_ip_address::local_ip;
-use service_berry::{config, peripheral, server};
+use service_berry::{
+    config, peripheral,
+    server::{self, handlers::PartialPayload},
+};
+use tokio::sync::mpsc;
 use users::get_current_username;
 
 #[tokio::main]
@@ -40,26 +44,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .map_err(|e| format!("Failed to register mDNS: {}", e))?;
 
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<server::handlers::PartialPayload>();
+    let (tx, mut rx) = mpsc::channel::<PartialPayload>(100);
 
     // Start the BLE peripheral
     tokio::spawn(async move {
         peripheral::ble_peripheral(tx).await;
     });
 
-    // Start the Worker
     tokio::spawn(async move {
         while let Some(payload) = rx.recv().await {
-            tracing::info!("Worker received payload from BLE: {:?}", payload);
-            // This is where you call your submission logic
-            if let Err(e) = server::handlers::process_submit(payload).await {
-                tracing::error!("Failed to process BLE submission: {:?}", e);
-            }
+            tokio::spawn(async move {
+                tracing::debug!("Worker processing payload: {:?}", payload);
+                if let Err(e) = server::handlers::process_submit(payload).await {
+                    tracing::error!("Failed to process submission: {:?}", e);
+                }
+            });
         }
     });
 
     // Start HTTP server
-    server::start_tls(identity).await?;
+    tokio::spawn(async {
+        if let Err(e) = server::start_http().await {
+            tracing::error!("HTTP server error: {:?}", e);
+        }
+    });
 
+    server::start_https(identity).await?;
     Ok(())
 }

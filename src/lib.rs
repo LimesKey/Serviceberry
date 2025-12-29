@@ -27,7 +27,7 @@ pub mod server {
     pub mod handlers;
     pub mod mdns_service;
 
-    use axum::routing::{get, post};
+    use axum::routing::{get, post, options};
     use axum::{Router, body::Body, http::Request};
     use hyper_util::rt::tokio::TokioIo;
     use rustls::ServerConfig;
@@ -37,14 +37,15 @@ pub mod server {
     use tower_http::trace::TraceLayer;
     use tracing::Span;
 
-    use crate::config::{HTTP_SERVER_PORT, Identity};
+    use crate::config::{HTTP_SERVER_PORT, HTTPS_SERVER_PORT, Identity};
     use crate::error::Result;
 
     pub fn create_router() -> Router {
         Router::new()
-            .route("/submit", post(handlers::process_submit_http))
+            .route("/submit", post(handlers::process_submit_https))
             .route("/status", get(handlers::handle_status))
-            .route("/request", get(handlers::handle_request))
+            .route("/request", post(handlers::handle_request))
+            .route("/request", options(handlers::handle_request_options))
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(|request: &Request<Body>| {
@@ -73,7 +74,7 @@ pub mod server {
             )
     }
 
-    pub async fn start_tls(identity: Identity) -> Result<()> {
+    pub async fn start_https(identity: Identity) -> Result<()> {
         let certs = identity.certs;
         let key = identity.key;
 
@@ -83,7 +84,7 @@ pub mod server {
             .map_err(|e| crate::error::Error::Other(e.to_string()))?;
 
         let acceptor = TlsAcceptor::from(Arc::new(config));
-        let listener = TcpListener::bind(("0.0.0.0", HTTP_SERVER_PORT))
+        let listener = TcpListener::bind(("0.0.0.0", HTTPS_SERVER_PORT))
             .await
             .map_err(|e| crate::error::Error::Bind(e.to_string()))?;
 
@@ -111,6 +112,34 @@ pub mod server {
                         }
                     }
                     Err(e) => eprintln!("TLS handshake error: {}", e),
+                }
+            });
+        }
+    }
+
+    pub async fn start_http() -> Result<()> {
+        let listener = TcpListener::bind(("0.0.0.0", HTTP_SERVER_PORT))
+            .await
+            .map_err(|e| crate::error::Error::Bind(e.to_string()))?;
+
+        let router = create_router();
+        loop {
+            let (stream, _) = listener
+                .accept()
+                .await
+                .map_err(|e| crate::error::Error::Bind(e.to_string()))?;
+
+            let router = router.clone();
+
+            tokio::spawn(async move {
+                let io = TokioIo::new(stream);
+                let hyper_service = hyper_util::service::TowerToHyperService::new(router);
+
+                if let Err(e) = hyper::server::conn::http1::Builder::new()
+                    .serve_connection(io, hyper_service)
+                    .await
+                {
+                    eprintln!("Connection error: {}", e);
                 }
             });
         }

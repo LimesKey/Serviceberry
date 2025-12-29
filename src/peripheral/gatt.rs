@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex, mpsc};
 use tracing::info;
 use uuid::Uuid;
@@ -20,7 +20,7 @@ use ble_peripheral_rust::{
 
 use crate::server::handlers::PartialPayload;
 
-pub async fn ble_peripheral(payload_tx: UnboundedSender<PartialPayload>) {
+pub async fn ble_peripheral(payload_tx: Sender<PartialPayload>) {
     let service_uuid =
         Uuid::parse_str("12345678-1234-5678-1234-56789abcdef0").expect("invalid service UUID");
     let char_uuid =

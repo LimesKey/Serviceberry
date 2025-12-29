@@ -7,9 +7,10 @@ use std::{error::Error, fs, path::PathBuf};
 
 pub const SCAN_DURATION_SECS: u64 = 10;
 pub const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
-pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")); // not sure if this is the correct convention - todo
 pub const MDNS_SERVICE_TYPE: &str = "serviceberry"; // no capitals
 pub const HTTP_SERVER_PORT: u16 = 8080;
+pub const HTTPS_SERVER_PORT: u16 = 8443;
 pub const DEFAULT_HOSTNAME: &str = "turtle";
 
 /// Get the project configuration directory

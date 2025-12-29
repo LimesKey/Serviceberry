@@ -21,6 +21,7 @@ pub enum Error {
 
     // Server errors
     Bind(String),
+    BadRequest(String),
 
     // Config errors
     Config(String),
@@ -43,6 +44,7 @@ impl fmt::Display for Error {
             Error::HttpStatus { status, body } => write!(f, "HTTP {}: {}", status, body),
             Error::Serialization(msg) => write!(f, "Serialization error: {}", msg),
             Error::Bind(msg) => write!(f, "Bind error: {}", msg),
+            Error::BadRequest(msg) => write!(f, "Bad request: {}", msg),
             Error::Config(msg) => write!(f, "Config error: {}", msg),
             Error::Io(e) => write!(f, "IO error: {}", e),
             Error::Json(e) => write!(f, "JSON error: {}", e),
@@ -72,6 +74,7 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             Error::Other(ref msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            Error::BadRequest(ref msg) => (StatusCode::BAD_REQUEST, msg),
             Error::Bind(ref msg) => (StatusCode::BAD_REQUEST, msg),
             Error::BleAdapter(_) => todo!(),
             Error::WifiScan(_) => todo!(),
