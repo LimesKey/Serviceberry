@@ -39,7 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &hostname,
         lan_ip,
         version,
-        &identity.certs_hash,
         &username,
     )
     .map_err(|e| format!("Failed to register mDNS: {}", e))?;

@@ -13,7 +13,6 @@ pub fn register_mdns_service(
     device_name: &str, // computer/device name, e.g: "My-MacBook"
     lan_ip: IpAddr,
     version: &str,
-    cert_fingerprint: &[u8; 32],
     username: &str, // operating system username, e.g: "john"
 ) -> Result<ServiceDaemon, Box<dyn std::error::Error>> {
     let hostname = format!(
