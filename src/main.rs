@@ -17,26 +17,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     // get system info
-    let instance_name = hostname::get() // computer name
-        .unwrap_or_else(|_| config::DEFAULT_HOSTNAME.into())
+    let hostname = hostname::get() // computer/device name, e.g: "My-MacBook"
+        .unwrap_or_else(|_| "unknown-device-hostname".into())
         .to_string_lossy()
         .to_string();
-    let username = get_current_username() // system username
-        .unwrap_or_default()
+    let username = get_current_username() // operating system username, e.g: "john"
+        .expect("Cannot retrieve operating system username!")
         .to_string_lossy()
         .to_string();
     let version = env!("CARGO_PKG_VERSION");
     let lan_ip = local_ip().expect("Could not get local IP address");
 
-    println!("Starting ServiceBerry v{} on {}", version, instance_name);
+    println!("Starting ServiceBerry v{} on {}", version, hostname);
 
     // Generate TLS certificates
     let config_directory = config::config_dir();
-    let identity = config::load_identity(instance_name.clone(), config_directory)?;
+    let identity = config::load_identity(hostname.clone(), config_directory)?;
 
     // Register mDNS service
     let _mdns = server::mdns_service::register_mdns_service(
-        &instance_name,
+        &hostname,
         lan_ip,
         version,
         &identity.certs_hash,
@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Some(payload) = rx.recv().await {
             tokio::spawn(async move {
                 tracing::debug!("Worker processing payload: {:?}", payload);
-                if let Err(e) = server::handlers::process_submit(payload).await {
+                if let Err(e) = server::handlers::submit_payload(payload).await {
                     tracing::error!("Failed to process submission: {:?}", e);
                 }
             });

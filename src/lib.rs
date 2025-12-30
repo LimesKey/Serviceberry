@@ -26,6 +26,7 @@ pub mod peripheral {
 pub mod server {
     pub mod handlers;
     pub mod mdns_service;
+    pub mod geo_provider;
 
     use axum::routing::{get, post, options};
     use axum::{Router, body::Body, http::Request};
@@ -42,10 +43,10 @@ pub mod server {
 
     pub fn create_router() -> Router {
         Router::new()
-            .route("/submit", post(handlers::process_submit_https))
-            .route("/status", get(handlers::handle_status))
-            .route("/request", post(handlers::handle_request))
-            .route("/request", options(handlers::handle_request_options))
+            .route("/submit", post(handlers::submit))
+            .route("/status", get(handlers::status))
+            .route("/request", post(handlers::request_post))
+            .route("/request", options(handlers::request_options))
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(|request: &Request<Body>| {

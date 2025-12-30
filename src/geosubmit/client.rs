@@ -61,18 +61,18 @@ pub async fn assemble_geo_payload(
 /// Submit geolocation payload to the geosubmit API
 pub async fn submit_geo_payload(payload: items) -> Result<()> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
-    let http_client = reqwest::Client::builder()
+    let https_client = reqwest::Client::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| Error::Transport(e.to_string()))?;
 
-    let client: ClientWithMiddleware = ClientBuilder::new(http_client.clone())
+    let client: ClientWithMiddleware = ClientBuilder::new(https_client.clone())
         .with(TracingMiddleware::default())
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build();
 
-    let req = http_client
+    let req = https_client
         .post(GEOSUBMIT_ENDPOINT)
         .json(&payload)
         .build()

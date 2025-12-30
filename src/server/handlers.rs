@@ -1,6 +1,9 @@
-use axum::http::{HeaderMap, StatusCode, HeaderValue};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use hyper::header::{ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT};
+use hyper::header::{
+    ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
+    ACCESS_CONTROL_MAX_AGE
+};
 use mime::Mime;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,10 +21,10 @@ pub struct PartialPayload {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
-pub struct RequestHeaders {
-    pub user_agent: String,
-    pub content_type: Mime, // parsed content type
-    pub content_length: usize,
+struct RequestHeaders {
+    user_agent: String,
+    content_type: Mime, // parsed content type
+    content_length: usize,
 }
 
 fn get_header<'a>(
@@ -33,12 +36,14 @@ fn get_header<'a>(
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| {
             error!(header = key, "Missing or invalid header");
-            (StatusCode::BAD_REQUEST, format!("Missing or invalid {}", key))
+            (
+                StatusCode::BAD_REQUEST,
+                format!("Missing or invalid {}", key),
+            )
         })
 }
 
-
-pub fn validate_headers(headers: &HeaderMap) -> Result<RequestHeaders, (StatusCode, String)> {
+fn validate_headers(headers: &HeaderMap) -> Result<RequestHeaders, (StatusCode, String)> {
     // User-Agent
     let user_agent = get_header(headers, "user-agent")?;
     debug!(user_agent = %user_agent, "Parsed User-Agent header");
@@ -57,8 +62,14 @@ pub fn validate_headers(headers: &HeaderMap) -> Result<RequestHeaders, (StatusCo
     // Content-Length
     let content_length_str = get_header(headers, "content-length")?;
     let content_length = content_length_str.parse::<usize>().map_err(|_| {
-        error!(header = "content-length", "Failed to parse Content-Length as number");
-        (StatusCode::LENGTH_REQUIRED, "Invalid Content-Length header".to_string())
+        error!(
+            header = "content-length",
+            "Failed to parse Content-Length as number"
+        );
+        (
+            StatusCode::LENGTH_REQUIRED,
+            "Invalid Content-Length header".to_string(),
+        )
     })?;
     debug!(content_length, "Parsed Content-Length header");
 
@@ -69,17 +80,17 @@ pub fn validate_headers(headers: &HeaderMap) -> Result<RequestHeaders, (StatusCo
     })
 }
 
-pub async fn process_submit_https(
+pub async fn submit(
     axum::Json(value): axum::Json<serde_json::Value>,
 ) -> Result<String, crate::error::Error> {
     let payload: PartialPayload = serde_json::from_value(value)
         .map_err(|e| crate::error::Error::Other(format!("JSON Parse Error: {}", e)))?;
 
-    process_submit(payload).await
+    submit_payload(payload).await
 }
 
-pub async fn process_submit(payload: PartialPayload) -> Result<String, crate::error::Error> {
-    info!("[Server] Processing submission...");
+pub async fn submit_payload(payload: PartialPayload) -> Result<String, crate::error::Error> {
+    info!("Processing submission...");
 
     let geo_items: items = geosubmit::assemble_geo_payload(payload.position, payload.cell_towers)
         .await
@@ -100,22 +111,24 @@ pub async fn process_submit(payload: PartialPayload) -> Result<String, crate::er
             }
         },
         Err(_) => {
-            info!("Submission taking longer than 3s; continuing in background.");
+            info!(
+                "Submission taking longer than 3s; continuing in background, not checking completion status."
+            );
         }
     }
 
     Ok(String::from("Successful"))
 }
 
-pub async fn handle_status() -> (StatusCode, String) {
-    (StatusCode::OK, "ok".to_string())
+pub async fn status() -> (StatusCode, String) {
+    todo!()
 }
 
-pub async fn handle_request_options() -> Response {
+pub async fn request_options() -> Response {
     let mut headers = HeaderMap::new();
     headers.insert(
         ACCESS_CONTROL_ALLOW_ORIGIN,
-        HeaderValue::from_static("https://localhost"),
+        HeaderValue::from_static("https://localhost"), // idk may need refractoring
     );
     headers.insert(
         ACCESS_CONTROL_ALLOW_METHODS,
@@ -125,17 +138,14 @@ pub async fn handle_request_options() -> Response {
         ACCESS_CONTROL_ALLOW_HEADERS,
         HeaderValue::from_static("Content-Type"),
     );
-    headers.insert(
-        ACCESS_CONTROL_MAX_AGE,
-        HeaderValue::from_static("86400"),
-    );
-    
+    headers.insert(ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("86400"));
+
     (StatusCode::NO_CONTENT, headers).into_response()
 }
 
-pub async fn handle_request(
+pub async fn request_post(
     headers: HeaderMap,
-    axum::Json(payload): axum::Json<serde_json::Value>,
+    payload: axum::Json<serde_json::Value>,
 ) -> Result<Response, (StatusCode, String)> {
     let request_headers = validate_headers(&headers)?; // preliminary checks to check for correct request
 
@@ -143,6 +153,25 @@ pub async fn handle_request(
         "[Server] Request received - User-Agent: {}, Content-Type: {}, Payload: {:?}",
         request_headers.user_agent, request_headers.content_type, payload
     );
+
+    if request_headers.content_length < 1 {
+        debug!("Received keepalive request, responding with 200 OK");
+        return Ok(StatusCode::OK.into_response());
+    } else if !serde_json::to_string(&payload.0)
+        .unwrap()
+        .to_ascii_lowercase()
+        .contains("macaddress")
+    {
+        // if payload has content but does not contain macAddress field
+        error!(
+            "Payload missing required field: macAddress, {}",
+            serde_json::to_string(&payload.0).expect("Nothing in payload json")
+        );
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Payload missing required field: macAddress".to_string(),
+        ));
+    }
 
     Ok((StatusCode::OK, "Request received").into_response())
 }
