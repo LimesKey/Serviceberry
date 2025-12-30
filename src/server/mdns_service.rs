@@ -25,7 +25,7 @@ pub fn register_mdns_service(
 
     let properties_http = HashMap::from([
         ("version".into(), version.into()),
-        ("paths".into(), "/status, /request".into())
+        ("paths".into(), "/status, /request".into()),
     ]);
 
     let mdns = ServiceDaemon::new()?;
@@ -51,10 +51,6 @@ pub fn register_mdns_service(
     let properties_https = HashMap::from([
         ("version".into(), version.into()),
         ("paths".into(), "/submit, /status, /request".into()),
-        (
-            "cert_fingerprint".into(),
-            hex::encode(cert_fingerprint).into(),
-        ),
     ]);
 
     // HTTPS service
