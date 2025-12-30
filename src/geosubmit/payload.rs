@@ -1,6 +1,11 @@
 //! Geosubmit API payload types
 
+use std::{env, path::PathBuf};
+
 use serde::{Deserialize, Serialize};
+use tracing::debug;
+
+use crate::config::MDNS_SERVICE_TYPE;
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
 #[allow(nonstandard_style)]
@@ -58,5 +63,25 @@ impl CellTower {
             "lte" => Some(RadioType::Lte),
             _ => None,
         }
+    }
+}
+
+pub fn cache_file_path() -> PathBuf {
+    let mut p = env::temp_dir();
+    p.push(MDNS_SERVICE_TYPE.to_ascii_lowercase());
+    p.push("last_geosubmit.json");
+    p
+}
+
+impl items {
+    pub fn save_cache(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let path = cache_file_path();
+        std::fs::create_dir_all(path.parent().unwrap())?;
+
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, serde_json::to_vec_pretty(self)?)?;
+        std::fs::rename(tmp, &path)?;
+        debug!("Saved last geosubmit payload to {:?}", path);
+        Ok(())
     }
 }

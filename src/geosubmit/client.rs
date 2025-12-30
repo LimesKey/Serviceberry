@@ -55,6 +55,8 @@ pub async fn assemble_geo_payload(
         CellTowers: cell_towers,
     };
 
+    payload.save_cache().unwrap();
+
     Ok(payload)
 }
 

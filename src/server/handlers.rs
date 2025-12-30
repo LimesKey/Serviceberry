@@ -1,8 +1,9 @@
+use axum::body::Body;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use hyper::header::{
-    ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
-    ACCESS_CONTROL_MAX_AGE
+    self, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
+    ACCESS_CONTROL_MAX_AGE,
 };
 use mime::Mime;
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,7 @@ use tokio::time::timeout;
 use tracing::{debug, error, info};
 
 use crate::geosubmit::{self, items};
+use crate::server::geo_provider::{GeoProviderRequest, geo_provider_response};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PartialPayload {
@@ -173,5 +175,17 @@ pub async fn request_post(
         ));
     }
 
-    Ok((StatusCode::OK, "Request received").into_response())
+    let payload_data: GeoProviderRequest = serde_json::from_value(payload.0)
+        .map_err(|e| crate::error::Error::Other(format!("Invalid JSON payload: {}", e)))
+        .unwrap();
+
+    let body = serde_json::to_string(&geo_provider_response(payload_data))
+        .map_err(|e| crate::error::Error::Other(format!("Failed to serialize JSON: {}", e)))
+        .unwrap();
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body))
+        .unwrap())
 }

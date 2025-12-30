@@ -27,21 +27,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_string();
     let version = env!("CARGO_PKG_VERSION");
     let lan_ip = local_ip().expect("Could not get local IP address");
+    let mdns_hostname = format!(
+        "{}-{}.local",
+        config::MDNS_SERVICE_TYPE.to_lowercase(),
+        username.to_lowercase()
+    );
 
     println!("Starting ServiceBerry v{} on {}", version, hostname);
 
     // Generate TLS certificates
     let config_directory = config::config_dir();
-    let identity = config::load_identity(hostname.clone(), config_directory)?;
+    let identity = config::load_identity(&mdns_hostname, config_directory)?;
 
     // Register mDNS service
-    let _mdns = server::mdns_service::register_mdns_service(
-        &hostname,
-        lan_ip,
-        version,
-        &username,
-    )
-    .map_err(|e| format!("Failed to register mDNS: {}", e))?;
+    let _mdns = server::mdns_service::register_mdns_service(&hostname, lan_ip, version, &username)
+        .map_err(|e| format!("Failed to register mDNS: {}", e))?;
 
     let (tx, mut rx) = mpsc::channel::<PartialPayload>(100);
 
