@@ -29,7 +29,7 @@ sudo dnf install pkgconf-pkg-config dbus-devel bluez bluez-libs-devel wireless-t
 ```
 
 **Arch Linux:**
-```bash
+```zsh
 sudo pacman -S pkgconf dbus bluez bluez-utils wireless_tools iw wpa_supplicant avahi openssl mkcert
 ```
 
@@ -41,6 +41,17 @@ After installing packages, enable and start the necessary system services:
 sudo systemctl enable --now bluetooth
 sudo systemctl enable --now avahi-daemon
 ```
+
+### Ports
+Serviceberry by default hosts on port `8080` for HTTP traffic and `8443` for HTTPS traffic. These are configurable in [config.rs](src/config.rs) as `HTTP_SERVER_PORT` and `HTTPS_SERVER_PORT`. Depending on your distro you may need to manually unblock these ports for discovery.
+
+In `Arch Linux` using `FirewallD` you can permeantly allow these two ports with
+```zsh
+sudo firewall-cmd --zone=home --add-port=8080/tcp --permanent \
+sudo firewall-cmd --zone=home --add-port=8443/tcp --permanent
+sudo firewall-cmd --reload
+```
+Ensure you have setup the exclsuion in the correct zone by listing your active zones, `firewall-cmd --get-active-zones`.
 
 ## Step by Step Install Guide
 1. Ensure you have installed the mobile IOS app with the correct permissions
