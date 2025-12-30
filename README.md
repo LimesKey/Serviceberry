@@ -42,7 +42,7 @@ sudo systemctl enable --now bluetooth
 sudo systemctl enable --now avahi-daemon
 ```
 
-## Step by Install Step Guide
+## Step by Step Install Guide
 1. Ensure you have installed the mobile IOS app with the correct permissions
 2. Download the latest release
 3. Install all the system packages
@@ -60,12 +60,6 @@ For detailed contributing guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.
 5. Make your changes following our coding standards
 6. Run tests and linting: `cargo test && cargo fmt && cargo clippy`
 7. Submit a pull request
-### Step by Step
-#### 1. Install Rust for Linux, macOS or another Unix-like Os
-- See [rust-lang.org](https://rust-lang.org/tools/install/) for additional help
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
 
 ##  TODO
 * [x] Add TLS encryption
