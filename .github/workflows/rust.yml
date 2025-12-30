@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install -y -qq \
             pkg-config libdbus-1-dev bluez libbluetooth-dev \
             wireless-tools iw wpasupplicant avahi-daemon \
-            openssl libssl-dev
+            openssl libssl-dev mkcert
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable

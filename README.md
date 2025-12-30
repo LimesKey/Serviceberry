@@ -1,14 +1,16 @@
 # Serviceberry
-The Serviceberry project aims to improve the accuracy & coverage of geolocation databases. It does this by submitting anonymized sensor & location data to a configured geolocation service. Serviceberry is designed to run in two interconnected parts: the Serviceberry IOS app and the Serviceberry desktop app. These two applications will communicate with each other via Wi-Fi or Bluetooth.
+The Serviceberry project provides fast, accurate location data to your system while enhancing the accuracy of public geolocation databases. It collects location information from your mobile device’s GNSS/GPS module and combines it with Wi-Fi and Bluetooth adapter data from a companion device. By default, Serviceberry contributes this data to BeaconDB, which anonymizes and obfuscates it to ensure privacy. Serviceberry operates as two interconnected components: the iOS app and the desktop app, which communicate via Wi-Fi or Bluetooth.
 
-Currently, Serviceberry is only guaranteed to support [BeaconDB](https://beacondb.net/) and Linux machines. See the todo below for current progress.
+Currently, Serviceberry is only guaranteed to support Linux machines, iOS devices and contributing to [BeaconDB](https://beacondb.net/). See the todo below for current progress.
 
 ##  TODO
-*   [x] Add TLS encryption
-*   [ ] Add support for Bluetooth connectivity
-*   [ ] Create the IOS Mobile App
-*   [ ] Build Tauri desktop app
-*   [ ] Add support for other geolocation databases
+* [x] Add TLS encryption
+* [x] Set up mDNS services
+* [x] Support geo.provider browser requests
+* [ ] Add Bluetooth connectivity
+* [ ] Build iOS mobile app
+* [ ] Build Tauri desktop app
+* [ ] Ensure support for other geolocation databases
 
 ## System Requirements
 
