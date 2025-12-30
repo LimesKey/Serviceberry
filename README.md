@@ -1,7 +1,7 @@
 # Serviceberry
 The Serviceberry project aims to provide reliable, accurate location data to your system therefore improving the accuracy of public geolocation databases for everyone. It collects location data from your mobile phone's GNSS/GPS sensor, and combines it with Wi-Fi and Bluetooth adapter data from a companion computer. By default, Serviceberry contributes this data to BeaconDB, whom then anonymizes and obfuscates it to ensure privacy. Serviceberry operates as two interconnected components: the desktop program and the iOS app, which communicate to each other via Wi-Fi or Bluetooth.
 
-Serviceberry responds to location requests at the hostname `https://serviceberry-<your-username>.local/request` for any browser implementing the [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/requests-geolocation) request format. Before this can happen, Serviceberry registers two mDNS services `_serviceberry-https._tcp.local.` and `_serviceberry-http._tcp.local.`, at ports 8443 and 8080 respectively. In order to use HTTPS, you'll need to generate a self-signed certificate and private key pair, and import the certificate in your browser's Certificate Manager, authorizing the cert for use in identifying websites. Serviceberry is designed to submit to any database implementing the [MLS/Ichnaea API's Geosubmit V2 format](https://ichnaea.readthedocs.io/en/latest/api/geosubmit2.html), with [BeaconDB](https://beacondb.net/) being the default.
+Serviceberry responds to location requests at the hostname `https://serviceberry-<your-username>.local/request` for any browser implementing the [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/requests-geolocation) request format. Before this can happen, Serviceberry registers two mDNS services `_serviceberry-https._tcp.local.` and `_serviceberry-http._tcp.local.`, at ports `8443` and `8080` respectively. In order to use HTTPS, you'll need to generate a self-signed certificate and private key pair, and import the certificate in your browser's Certificate Manager, authorizing the cert for use in identifying websites. Serviceberry is designed to submit to any database implementing the [MLS/Ichnaea API's Geosubmit V2 format](https://ichnaea.readthedocs.io/en/latest/api/geosubmit2.html), with [BeaconDB](https://beacondb.net/) being the default.
 
 Currently, Serviceberry only offically supports Linux machines, iOS devices; and has only been confirmed to support [BeaconDB](https://beacondb.net/). See the todo for current progress.
 
@@ -36,7 +36,12 @@ sudo systemctl enable --now bluetooth
 sudo systemctl enable --now avahi-daemon
 ```
 
-### Self Signed Certificate
+## Step by Install Step Guide
+1. Ensure you have installed the mobile IOS app with the correct permissions
+2. Download the latest release
+3. Install all the system packages
+4. Set the `geo.provider.network.url` in `about:config` to `https://serviceberry-<your-username>.local/request`
+5. Watch logs for sucessful location
 
 ## Contributing
 For detailed contributing guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
