@@ -1,9 +1,8 @@
 //! Configuration, constants, and TLS certificate management
 
 use directories::ProjectDirs;
-use rcgen::generate_simple_self_signed;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use std::{error::Error, fs, path::PathBuf};
+use std::{error::Error, fs, path::PathBuf, process::Command};
 
 pub const SCAN_DURATION_SECS: u64 = 10;
 pub const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
@@ -14,7 +13,7 @@ pub const HTTPS_SERVER_PORT: u16 = 8443;
 
 /// Get the project configuration directory
 pub fn config_dir() -> PathBuf {
-    let proj_dirs = ProjectDirs::from("org", "LimesKey", "serviceberry")
+    let proj_dirs = ProjectDirs::from("com", "LimesKey", "serviceberry")
         .expect("Failed to get project directories");
 
     let config_dir = proj_dirs.config_dir();
@@ -28,27 +27,49 @@ pub struct Identity {
     pub certs_hash: [u8; 32],
 }
 
-/// Generate self-signed certificate and key if they don't already exist in the config dir
+// use mkcert for a locally trusted certificate - automatically valid in browser
 pub fn gen_cert(
-    hostname: String,
+    hostname: &String,
     config_directory: PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let cert_path = config_directory.join("cert.pem");
     let key_path = config_directory.join("key.pem");
 
-    let subject_alt_names = vec!["localhost".to_string(), format!("{}.local", hostname)];
-    let cert_pair = generate_simple_self_signed(subject_alt_names)?;
+    // only generate if the files don't exist yet
+    if !cert_path.exists() || !key_path.exists() {
+        // mkcert arguments: output files and hostnames
+        let output = Command::new("mkcert")
+            .args(&[
+                "-cert-file",
+                cert_path.to_str().unwrap(),
+                "-key-file",
+                key_path.to_str().unwrap(),
+                hostname,
+                // let mdns_hostname = format!(
+                //     "{}-{}.local",
+                //     config::MDNS_SERVICE_TYPE.to_lowercase(),
+                //     username.to_lowercase()
+                // );
+            ])
+            .output()?;
 
-    fs::write(&cert_path, cert_pair.cert.pem())?;
-    fs::write(&key_path, cert_pair.signing_key.serialize_pem())?;
+        if !output.status.success() {
+            return Err(
+                format!("mkcert failed: {}", String::from_utf8_lossy(&output.stderr)).into(),
+            );
+        }
 
-    println!("Generated self-signed certificate and key");
+        println!("Generated certificate and key with mkcert");
+    } else {
+        println!("Certificate and key already exist, skipping generation");
+    }
+
     Ok(())
 }
 
 /// Load TLS identity from certificate and key files
 pub fn load_identity(
-    hostname: String,
+    hostname: &String,
     config_directory: PathBuf,
 ) -> Result<Identity, Box<dyn Error>> {
     let cert_path = config_directory.join("cert.pem");
@@ -56,7 +77,7 @@ pub fn load_identity(
 
     if !std::path::Path::new(&cert_path).exists() || !std::path::Path::new(&key_path).exists() {
         // create keypair if not exist
-        gen_cert(hostname.clone(), config_directory.clone())?;
+        gen_cert(hostname, config_directory.clone())?;
     }
 
     let certs = fs::read(cert_path)?;
