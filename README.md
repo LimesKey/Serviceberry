@@ -1,7 +1,9 @@
 <h1>
-  <img src="assets/serviceberry.png" alt="Logo" width="40" style="vertical-align:middle; margin-right:5px;">
+  <img src="assets/serviceberry.png" alt="Logo" width="40"
+       style="position: relative; top: 9px; margin-right:5px;">
   Serviceberry
 </h1>
+
 
 The Serviceberry project aims to provide reliable, accurate location data to your system therefore improving the accuracy of public geolocation databases for everyone. It collects location data from your mobile phone's GNSS/GPS sensor, and combines it with Wi-Fi and Bluetooth adapter data from a companion computer. By default, Serviceberry contributes this data to BeaconDB, whom then anonymizes and obfuscates it to ensure privacy. Serviceberry operates as two interconnected components: the desktop program and the iOS app, which communicate to each other via Wi-Fi or Bluetooth.
 
