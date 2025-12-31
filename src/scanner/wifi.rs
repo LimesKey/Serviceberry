@@ -103,9 +103,9 @@ impl WifiBssid {
 
 #[instrument]
 pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
-    info!("Running WiFi scan");
+    info!("[WIFI] Running WiFi scan");
     let _ = tokio::process::Command::new("sudo")
-        .args(["iw", "dev", "wlan0", "scan", "trigger", "duration", &DWELL_TIME.to_string()])
+        .args(["iw", "dev", "wlan0", "scan", "trigger", "flush", "duration", &DWELL_TIME.to_string(), "duration-mandatory"])
         .output()
         .await
         .inspect_err(|e| error!(error = %e, "Failed to trigger scan"))
@@ -220,6 +220,6 @@ pub async fn fetch_wifi_stats() -> Vec<WifiBssid> {
         bssid_records.push(bssid);
     }
 
-    info!(total = bssid_records.len(), "Finished scanning");
+    info!("Finished scanning found {} BSSIDs", bssid_records.len());
     bssid_records
 }

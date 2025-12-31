@@ -4,7 +4,8 @@ use directories::ProjectDirs;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::{error::Error, fs, path::PathBuf, process::Command};
 
-pub const SCAN_DURATION_SECS: u64 = 10;
+pub const SCAN_DURATION_SECS: u64 = 29; // Do not run longer than 29 seconds to avoid expired wifi scan results
+pub const DWELL_TIME: u64 = 200; // in Time Units (1024 microseconds) - i think around 200ms per channel is a good balance
 pub const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")); // not sure if this is the correct convention - todo
 pub const MDNS_SERVICE_TYPE: &str = "Serviceberry";

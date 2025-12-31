@@ -2,6 +2,7 @@ use btleplug::api::BDAddr as mac_address;
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
 use btleplug::platform::Manager;
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 use std::time::Duration;
 use tokio::time;
 
@@ -23,7 +24,7 @@ pub async fn fetch_ble_devices() -> Vec<BleDevice> {
     let manager = match Manager::new().await {
         Ok(m) => m,
         Err(e) => {
-            println!("[BLE] Manager error: {:?}", e);
+            error!("[BLE] Manager error: {:?}", e);
             return devices;
         }
     };
@@ -33,12 +34,12 @@ pub async fn fetch_ble_devices() -> Vec<BleDevice> {
         // check to see if there's at least one bluetooth adapter/card
         Some(a) => a,
         None => {
-            println!("[BLE] No adapters found");
+            error!("[BLE] No adapters found");
             return devices;
         }
     };
 
-    println!("[BLE] Starting BLE scan...");
+    info!("[BLE] Starting BLE scan...");
 
     if let Err(e) = adapter.start_scan(ScanFilter::default()).await {
         println!("[BLE] Scan failed: {:?}", e);
