@@ -20,54 +20,32 @@ pub fn register_mdns_service(
         MDNS_SERVICE_TYPE.to_lowercase(),
         username.to_lowercase()
     );
-    let instance_name = format!("{} {}", MDNS_SERVICE_TYPE, device_name);
+    let instance_name = device_name;
 
-    let properties_http = HashMap::from([
+    let properties = HashMap::from([
         ("version".into(), version.into()),
-        ("paths".into(), "/status, /request".into()),
+        ("http".into(), HTTP_SERVER_PORT.to_string()),
+        ("https".into(), HTTPS_SERVER_PORT.to_string()),
+        ("paths".into(), "/submit,/status,/request".into()),
     ]);
 
     let mdns = ServiceDaemon::new()?;
 
-    // HTTP service
-    let http_service_type = format!("_{}-http._tcp.local.", MDNS_SERVICE_TYPE.to_lowercase());
-    let http_info = ServiceInfo::new(
-        &http_service_type, // Service type for discovery
-        &instance_name,     // Human-readable instance name
-        &hostname,          // DNS name clients connect to
-        lan_ip.to_string(),
-        HTTP_SERVER_PORT,
-        Some(properties_http.clone()),
-    )?;
-    mdns.register(http_info)?;
-    tracing::info!(
-        "HTTP mDNS service '{}' published at {}:{}",
-        device_name,
-        hostname.trim_end_matches('.'),
-        HTTP_SERVER_PORT
-    );
-
-    let properties_https = HashMap::from([
-        ("version".into(), version.into()),
-        ("paths".into(), "/submit, /status, /request".into()),
-    ]);
-
-    // HTTPS service
-    let https_service_type = format!("_{}-https._tcp.local.", MDNS_SERVICE_TYPE.to_lowercase());
-    let https_info = ServiceInfo::new(
-        &https_service_type, // Service type for discovery
-        &instance_name,      // Human-readable instance name
-        &hostname,           // DNS name clients connect to
+    let service_type = format!("_{}._tcp.local.", MDNS_SERVICE_TYPE.to_lowercase());
+    let service_info = ServiceInfo::new(
+        &service_type, // Service type for discovery
+        instance_name, // Human-readable instance name
+        &hostname,     // DNS name clients connect to
         lan_ip.to_string(),
         HTTPS_SERVER_PORT,
-        Some(properties_https),
+        Some(properties),
     )?;
-    mdns.register(https_info)?;
+    mdns.register(service_info)?;
     tracing::info!(
-        "HTTPS mDNS service '{}' published at {}:{}",
+        "mDNS service '{}' published at {}:{}",
         device_name,
         hostname.trim_end_matches('.'),
-        HTTPS_SERVER_PORT
+        HTTPS_SERVER_PORT,
     );
 
     Ok(mdns)
