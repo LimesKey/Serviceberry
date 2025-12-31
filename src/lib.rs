@@ -36,7 +36,7 @@ pub mod server {
     use tokio::net::TcpListener;
     use tokio_rustls::TlsAcceptor;
     use tower_http::trace::TraceLayer;
-    use tracing::Span;
+    use tracing::{Span, debug, info};
 
     use crate::config::{HTTP_SERVER_PORT, HTTPS_SERVER_PORT, Identity};
     use crate::error::Result;
@@ -47,6 +47,7 @@ pub mod server {
             .route("/status", get(handlers::status))
             .route("/request", post(handlers::request_post))
             .route("/request", options(handlers::request_options))
+            .route("/" , get(handlers::root))
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(|request: &Request<Body>| {
@@ -79,15 +80,20 @@ pub mod server {
         let certs = identity.certs;
         let key = identity.key;
 
-        let config = ServerConfig::builder()
+        let mut config = ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(certs, key)
             .map_err(|e| crate::error::Error::Other(e.to_string()))?;
+
+        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+
+        debug!("HTTPS TLS configuration initialized");
 
         let acceptor = TlsAcceptor::from(Arc::new(config));
         let listener = TcpListener::bind(("0.0.0.0", HTTPS_SERVER_PORT))
             .await
             .map_err(|e| crate::error::Error::Bind(e.to_string()))?;
+        info!("HTTPS server listening on 0.0.0.0:{}", HTTPS_SERVER_PORT);
 
         let router = create_router();
         loop {
@@ -122,6 +128,7 @@ pub mod server {
         let listener = TcpListener::bind(("0.0.0.0", HTTP_SERVER_PORT))
             .await
             .map_err(|e| crate::error::Error::Bind(e.to_string()))?;
+        info!("HTTP server listening on 0.0.0.0:{}", HTTP_SERVER_PORT);
 
         let router = create_router();
         loop {

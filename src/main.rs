@@ -9,6 +9,7 @@ use service_berry::{
     server::{self, handlers::PartialPayload},
 };
 use tokio::sync::mpsc;
+use tracing::info;
 use users::get_current_username;
 
 #[tokio::main]
@@ -27,13 +28,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_string();
     let version = env!("CARGO_PKG_VERSION");
     let lan_ip = local_ip().expect("Could not get local IP address");
+    info!("Local IP address: {}", lan_ip);
     let mdns_hostname = format!(
         "{}-{}.local",
         config::MDNS_SERVICE_TYPE.to_lowercase(),
         username.to_lowercase()
     );
 
-    println!("Starting ServiceBerry v{} on {}", version, hostname);
+    info!("Starting ServiceBerry v{} on {}", version, hostname);
 
     // Generate TLS certificates
     let config_directory = config::config_dir();

@@ -7,6 +7,8 @@ use std::{
 };
 use tracing::info;
 
+// see https://searchfox.org/firefox-main/source/dom/system/NetworkGeolocationProvider.sys.mjs
+
 #[derive(Serialize, Deserialize)]
 pub struct WifiBssid {
     #[serde(rename = "macAddress")]
