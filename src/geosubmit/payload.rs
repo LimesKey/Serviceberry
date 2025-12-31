@@ -5,7 +5,7 @@ use std::{env, path::PathBuf};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use crate::config::MDNS_SERVICE_TYPE;
+use crate::{config::MDNS_SERVICE_TYPE, scanner};
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
 #[allow(nonstandard_style)]
@@ -13,9 +13,14 @@ pub struct items {
     pub timestamp: u128,
     /// Timestamp in milliseconds since Unix epoch
     pub position: Position,
-    pub bluetoothBeacons: Vec<crate::scanner::BleDevice>,
-    pub wifiAccessPoints: Vec<crate::scanner::WifiBssid>,
+    pub bluetoothBeacons: Vec<scanner::BleDevice>,
+    pub wifiAccessPoints: Vec<scanner::WifiBssid>,
     pub CellTowers: Option<Vec<CellTower>>,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone)]
+pub struct GeosubmitRequest {
+    pub items: Vec<items>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
