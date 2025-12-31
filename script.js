@@ -1,5 +1,6 @@
-const GEOSUBMIT_ENDPOINT = "https://api.beacondb.net/v2/geosubmit";
-const RUST_SERVER_URL = "http://192.168.0.251:3030/network_json";
+// const MDNS_ENDPOINT = "https://serviceberry-limeskey.local:8443/submit";
+// const MDNS_ENDPOINT = "http://serviceberry-limeskey.local:8080/submit";
+const MDNS_ENDPOINT = "http://192.168.0.251:8080/submit";
 
 let logBuffer = "";
 
@@ -11,76 +12,66 @@ function log(msg) {
 async function getPosition() {
   try {
     const loc = await Location.current();
+    log("[Location] Successfully retrieved GPS location.");
     return {
-      latitude: loc.latitude,
-      longitude: loc.longitude,
-      accuracy: loc.horizontalAccuracy,
-      altitude: loc.altitude,
-      altitudeAccuracy: loc.verticalAccuracy,
-      heading: loc.course,        // Heading in degrees
-      speed: loc.speed,          // Speed in meters/sec
-      source: "gps"
+      latitude: loc.latitude ?? 0,
+      longitude: loc.longitude ?? 0,
+      accuracy: loc.horizontalAccuracy ?? 0,
+      altitude: loc.altitude ?? 0,
+      altitudeAccuracy: loc.verticalAccuracy ?? 0,
+      heading: loc.course ?? 0,
+      speed: loc.speed ?? 0,
+      source: "gnss",
     };
   } catch (e) {
     log("[Location] Failed: " + e.toString());
-    return {};
-  }
-}
-
-// Fetch JSON from Rust server
-async function fetchJson() {
-  try {
-    const req = new Request(RUST_SERVER_URL);
-    const json = await req.loadJSON();
-    log("[JSON] Fetched items: " + (json.items ? json.items.length : 0));
-    return json;
-  } catch (e) {
-    log("[JSON] Fetch Error: " + e.toString());
-    return { items: [] };
+    throw e;
   }
 }
 
 // Main
 async function main() {
   try {
-    const data = await fetchJson();
+    // Only gather device GPS location and send a Position-only payload
     const position = await getPosition();
 
-    // Overwrite position if GPS available
-    if (data.items && data.items.length > 0) {
-      data.items[0].position = Object.keys(position).length ? position : data.items[0].position;
-    }
+    const payload = {
+      position: {
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
+        altitude: position.altitude,
+        altitudeAccuracy: position.altitudeAccuracy,
+        heading: position.heading,
+        speed: position.speed,
+        source: position.source,
+      },
+    };
 
-    log("[Payload] Ready to submit to BeaconDB:\n" + JSON.stringify(data, null, 2));
+    log("[Payload] Position-only payload:\n" + JSON.stringify(payload, null, 2));
 
-    let req; // Define req outside the inner try block to access it in catch
-    try {
-      req = new Request(GEOSUBMIT_ENDPOINT);
+    async function sendPayload(url, body) {
+      log(`[POST] Sending payload to: ${url}`);
+      let req = new Request(url);
       req.method = "POST";
-      req.headers = {
-        "Content-Type": "application/json"
-      };
-      req.body = JSON.stringify(data, null, 2);
-
-      // Use loadString() to get the response without throwing an error
-      // if the body is empty or non-JSON (but still a successful status).
-      // If the request succeeds (2xx status), loadString() returns
-      // the body and the status code is available on req.response.
-      await req.loadString();
-      
-      const statusCode = req.response.statusCode;
-      log(`[BeaconDB Response] Status Code: ${statusCode}`);
-      
-    } catch (e) {
-      // If the request fails (4xx or 5xx status), Scriptable throws an
-      // error, but the response object is still often attached to the request.
-      if (req && req.response && req.response.statusCode) {
-        log(`[BeaconDB Submission Error] HTTP Status Code: ${req.response.statusCode}`);
-      } else {
-        // Handle non-HTTP errors (e.g., network issues)
-        log("[BeaconDB Submission Error] " + e.toString());
+      req.headers = { "Content-Type": "application/json" };
+      req.body = JSON.stringify(body);
+      try {
+        const res = await req.loadString();
+        const status = req.response && req.response.statusCode ? req.response.statusCode : null;
+        log(`[POST ${url}] Status: ${status}`);
+        log(`[POST ${url}] Response length: ${res.length}`);
+      } catch (e) {
+        if (req && req.response && req.response.statusCode) {
+          log(`[POST ${url}] HTTP Error Status: ${req.response.statusCode}`);
+        } else {
+          log(`[POST ${url}] Error: ${e.toString()}`);
+        }
       }
     }
+
+    // Send directly to IP
+    await sendPayload(MDNS_ENDPOINT, payload);
 
     QuickLook.present(logBuffer);
 
