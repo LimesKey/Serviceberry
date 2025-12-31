@@ -189,3 +189,13 @@ pub async fn request_post(
         .body(Body::from(body))
         .unwrap())
 }
+
+pub async fn root() -> Response {
+    info!("You've reached the ServiceBerry server!");
+    let html = "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>hi you've reached me</body></html>";
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+        .body(Body::from(html))
+        .unwrap()
+}
