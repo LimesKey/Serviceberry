@@ -3,6 +3,7 @@
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use reqwest_tracing::TracingMiddleware;
+use tracing::debug;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Instant;
 
@@ -10,7 +11,7 @@ use crate::config::{APP_USER_AGENT, GEOSUBMIT_ENDPOINT};
 use crate::scanner::{bluetooth, wifi};
 use crate::error::{Error, Result};
 
-use super::payload::items;
+use super::payload::{items, GeosubmitRequest};
 
 /// Assemble geolocation payload from current scans
 pub async fn assemble_geo_payload(
@@ -27,6 +28,8 @@ pub async fn assemble_geo_payload(
         ),
         None => None,
     };
+
+    debug!("Mobile Device Request: {:?}", position);
 
     let wifi_start = Instant::now();
     let ble_start = Instant::now();
@@ -69,6 +72,12 @@ pub async fn submit_geo_payload(payload: items) -> Result<()> {
         .build()
         .map_err(|e| Error::Transport(e.to_string()))?;
 
+    let request_body = GeosubmitRequest {
+        items: vec![payload],
+    };
+
+    debug!("Request JSON Body: {:?}", serde_json::to_string_pretty(&request_body).unwrap_or_default());
+
     let client: ClientWithMiddleware = ClientBuilder::new(https_client.clone())
         .with(TracingMiddleware::default())
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
@@ -76,7 +85,7 @@ pub async fn submit_geo_payload(payload: items) -> Result<()> {
 
     let req = https_client
         .post(GEOSUBMIT_ENDPOINT)
-        .json(&payload)
+        .json(&request_body)
         .build()
         .map_err(|e| Error::Transport(e.to_string()))?;
 
@@ -95,8 +104,7 @@ pub async fn submit_geo_payload(payload: items) -> Result<()> {
         });
     }
 
-    tracing::info!("Geosubmit response status: {}", status);
-    tracing::info!("Geosubmit response body: {}", body);
+    tracing::info!("BeaconDB returned response status: {}", status);
 
     Ok(())
 }
