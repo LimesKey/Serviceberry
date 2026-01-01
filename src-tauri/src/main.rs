@@ -1,7 +1,6 @@
 //! ServiceBerry - Geolocation service via WiFi & Bluetooth scanning
-//!
-//! A service that scans nearby WiFi and Bluetooth devices and submits
-//! location data to the Ichnaea geolocation service.
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use local_ip_address::local_ip;
 use service_berry::{
@@ -12,23 +11,41 @@ use tokio::sync::mpsc;
 use tracing::info;
 use users::get_current_username;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
+fn main() {
+    // Logging must be initialized BEFORE Tauri starts
     tracing_subscriber::fmt::init();
 
-    // get system info
-    let hostname = hostname::get() // computer/device name, e.g: "My-MacBook"
+    tauri::Builder::default()
+        .setup(|_app| {
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = run_backend().await {
+                    tracing::error!("Backend failed: {:?}", e);
+                }
+            });
+
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+async fn run_backend() -> Result<(), Box<dyn std::error::Error>> {
+    // System info
+    let hostname = hostname::get()
         .unwrap_or_else(|_| "unknown-device-hostname".into())
         .to_string_lossy()
         .to_string();
-    let username = get_current_username() // operating system username, e.g: "john"
+
+    let username = get_current_username()
         .expect("Cannot retrieve operating system username!")
         .to_string_lossy()
         .to_string();
+
     let version = env!("CARGO_PKG_VERSION");
     let lan_ip = local_ip().expect("Could not get local IP address");
+
     info!("Local IP address: {}", lan_ip);
+
     let mdns_hostname = format!(
         "{}-{}.local",
         config::MDNS_SERVICE_TYPE.to_lowercase(),
@@ -37,24 +54,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting ServiceBerry v{} on {}", version, hostname);
 
-    // Generate TLS certificates
+    // TLS identity
     let config_directory = config::config_dir();
     let identity = config::load_identity(&mdns_hostname, config_directory)?;
 
-    // Register mDNS service
+    // mDNS
     let _mdns = server::mdns_service::register_mdns_service(&hostname, lan_ip, version, &username)
         .map_err(|e| format!("Failed to register mDNS: {}", e))?;
 
     let (tx, mut rx) = mpsc::channel::<PartialPayload>(100);
 
-    // Start the BLE peripheral
-    tokio::spawn(async move {
+    // BLE peripheral
+    tauri::async_runtime::spawn(async move {
         peripheral::ble_peripheral(tx).await;
     });
 
-    tokio::spawn(async move {
+    // Payload workers
+    tauri::async_runtime::spawn(async move {
         while let Some(payload) = rx.recv().await {
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 tracing::debug!("Worker processing payload: {:?}", payload);
                 if let Err(e) = server::handlers::submit_payload(payload).await {
                     tracing::error!("Failed to process submission: {:?}", e);
@@ -63,13 +81,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Start HTTP server
-    tokio::spawn(async {
+    // HTTP server
+    tauri::async_runtime::spawn(async {
         if let Err(e) = server::start_http().await {
             tracing::error!("HTTP server error: {:?}", e);
         }
     });
 
+    // HTTPS blocks
     server::start_https(identity).await?;
+
     Ok(())
 }
