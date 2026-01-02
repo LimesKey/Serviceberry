@@ -1,0 +1,24 @@
+target/
+debug/
+**/*.rs.bk
+*.pdb
+
+**/mutants.out*/
+
+
+.vscode/
+.idea/
+*.swp
+
+# OS
+
+.DS_Store
+
+*.log
+
+*.tmp
+*.zip
+
+*.txt
+*.zsh
+*.csv

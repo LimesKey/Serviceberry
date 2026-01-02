@@ -1,10 +1,13 @@
 //! Configuration, constants, and TLS certificate management
 
+use crate::scanner;
+use clap::Parser;
 use directories::ProjectDirs;
+use neli_wifi::Nl80211Iftype as IfType;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::{error::Error, fs, path::PathBuf, process::Command};
 
-pub const SCAN_DURATION_SECS: u64 = 29; // Do not run longer than 29 seconds to avoid expired wifi scan results
+pub const SCAN_DURATION_SECS: u64 = 20; // Do not run longer than 29 seconds to avoid expired wifi scan results
 pub const DWELL_TIME: u64 = 200; // in Time Units (1024 microseconds) - i think around 200ms per channel is a good balance
 pub const GEOSUBMIT_ENDPOINT: &str = "https://api.beacondb.net/v2/geosubmit";
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")); // not sure if this is the correct convention - todo
@@ -12,14 +15,86 @@ pub const MDNS_SERVICE_TYPE: &str = "Serviceberry";
 pub const HTTP_SERVER_PORT: u16 = 8080;
 pub const HTTPS_SERVER_PORT: u16 = 8443;
 
-/// Get the project configuration directory
-pub fn config_dir() -> PathBuf {
-    let proj_dirs = ProjectDirs::from("com", "LimesKey", "serviceberry")
-        .expect("Failed to get project directories");
+#[derive(Parser, Debug, Clone)]
+#[command(name = "serviceberry")]
+#[command(about = "Geolocation service via WiFi & Bluetooth scanning")]
+pub struct Config {
+    /// Wi-Fi adapter to use (e.g., wlan0)
+    #[arg(value_name = "WIFI_ADAPTER")]
+    pub wifi_adapter: String,
 
-    let config_dir = proj_dirs.config_dir();
-    fs::create_dir_all(config_dir).expect("Failed to create config directory");
-    config_dir.to_path_buf()
+    #[arg(long, default_value_t = HTTP_SERVER_PORT)]
+    pub http_server_port: u16,
+
+    #[arg(long, default_value_t = HTTPS_SERVER_PORT)]
+    pub https_server_port: u16,
+
+    #[arg(long, default_value_t = SCAN_DURATION_SECS)]
+    pub scan_duration_secs: u64,
+
+    #[arg(long, default_value_t = DWELL_TIME)]
+    pub dwell_time: u64,
+
+    #[arg(long, default_value_t = GEOSUBMIT_ENDPOINT.to_string())]
+    pub geosubmit_endpoint: String,
+
+    #[arg(long, default_value_t = APP_USER_AGENT.to_string())]
+    pub user_agent: String,
+
+    // Optional override for config directory
+    #[arg(long)]
+    pub directory: PathBuf,
+}
+
+impl Config {
+    pub fn parse_args() -> Self {
+        let mut cfg = Self::parse();
+
+        // If wifi_adapter not provided, try to auto detect
+        if cfg.wifi_adapter.is_empty() {
+            cfg.wifi_adapter = Self::detect_default_adapter().unwrap_or_else(|| {
+                eprintln!("No Wi-Fi adapter specified and none detected. Please provide one.");
+                std::process::exit(1);
+            });
+        }
+
+        // if user didn't specify a config dir, use default
+        if cfg.directory.as_os_str().is_empty() {
+            cfg.directory = Self::get_config_dir();
+        }
+
+        cfg
+    }
+
+    fn detect_default_adapter() -> Option<String> {
+        // Fetch all interfaces
+        let interfaces = scanner::wifi::fetch_wifi_interfaces().ok()?;
+
+        for iface in interfaces {
+            // Make sure we have a name and type
+            if let (Some(name_bytes), Some(iftype)) = (&iface.name, iface.iftype) {
+                let name = String::from_utf8_lossy(name_bytes).to_string();
+
+                // Pick only "managed" Wi-Fi interfaces
+                if iftype == IfType::IftypeStation {
+                    return Some(name);
+                }
+            }
+        }
+
+        // None found
+        None
+    }
+
+    pub fn get_config_dir() -> PathBuf {
+        let proj_dirs = ProjectDirs::from("com", "LimesKey", "Serviceberry").unwrap();
+        let dir = proj_dirs.config_dir();
+        std::fs::create_dir_all(dir).expect(&format!(
+            "Failed to create config directory at {}",
+            dir.display()
+        ));
+        dir.to_path_buf()
+    }
 }
 
 pub struct Identity {
@@ -30,8 +105,8 @@ pub struct Identity {
 
 // use mkcert for a locally trusted certificate - automatically valid in browser
 pub fn gen_cert(
-    hostname: &String,
-    config_directory: PathBuf,
+    hostname: &str,
+    config_directory: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let cert_path = config_directory.join("cert.pem");
     let key_path = config_directory.join("key.pem");
@@ -70,15 +145,15 @@ pub fn gen_cert(
 
 /// Load TLS identity from certificate and key files
 pub fn load_identity(
-    hostname: &String,
-    config_directory: PathBuf,
+    hostname: &str,
+    config_directory: &PathBuf,
 ) -> Result<Identity, Box<dyn Error>> {
     let cert_path = config_directory.join("cert.pem");
     let key_path = config_directory.join("key.pem");
 
     if !std::path::Path::new(&cert_path).exists() || !std::path::Path::new(&key_path).exists() {
         // create keypair if not exist
-        gen_cert(hostname, config_directory.clone())?;
+        gen_cert(hostname, config_directory)?;
     }
 
     let certs = fs::read(cert_path)?;
