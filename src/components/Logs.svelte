@@ -55,9 +55,11 @@ const levelConfig = {
 		{:else}
 			{#each items as log (log.id)}
 				<li class="log-item" data-level={log.level}>
-					<span class="log-icon" aria-hidden="true"
-						>{levelConfig[log.level]}</span
-					>
+					<span
+						class="log-icon"
+						aria-hidden="true"
+						style={`background-color: ${levelConfig[log.level].color}`}
+					></span>
 					<div class="log-content">
 						<div class="log-header-row">
 							<span class="log-time">{log.ts}</span>
@@ -187,10 +189,11 @@ const levelConfig = {
 }
 
 .log-icon {
-	font-size: var(--text-base);
+	width: 10px;
+	height: 10px;
+	border-radius: var(--radius-full);
 	flex-shrink: 0;
-	width: 20px;
-	text-align: center;
+	margin-top: 6px;
 }
 
 .log-content {

@@ -25,7 +25,7 @@ pub async fn list_bt() -> Result<Value, String> {
     let mapped: Result<Vec<Value>, String> = res
         .into_iter()
         .map(|dev| {
-            let mut v = serde_json::to_value(dev).map_err(|e| e.to_string())?;
+            let v = serde_json::to_value(dev).map_err(|e| e.to_string())?;
             if let Value::Object(mut m) = v {
                 // rename macAddress -> address
                 if let Some(mac) = m.remove("macAddress") {

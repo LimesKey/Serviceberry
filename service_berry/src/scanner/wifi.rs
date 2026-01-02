@@ -15,7 +15,7 @@ use crate::config::{DWELL_TIME, SCAN_DURATION_SECS};
 // "Do NOT screenscrape this tool, we don't consider its output stable."
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Cipher {
+pub enum Cipher { // Pairwise Cipher
     CCMP,
     TKIP,
     GCMP,
@@ -23,7 +23,7 @@ pub enum Cipher {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum AuthSuite {
+pub enum AuthSuite { // Authentication Suite
     PSK,
     SAE,
     EAP,
