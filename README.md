@@ -12,6 +12,8 @@ Serviceberry responds to location requests at the hostname `https://serviceberry
 Currently, Serviceberry only offically supports Linux machines, iOS devices; and has only been confirmed to support [BeaconDB](https://beacondb.net/). See the todo for current progress.
 
   
+![serviceberry-tauri-gui](assets/serviceberry-demo.png)
+
 ## Prerequisites
 
 ### Linux Packages
@@ -58,7 +60,7 @@ Ensure you have setup the exclsuion in the correct zone by listing your active z
 2. Download the latest release
 3. Install all the system packages
 4. Set the `geo.provider.network.url` in `about:config` to `https://serviceberry-<your-username>.local/request`
-5. Give the binary Wifi capability permissions `sudo setcap cap_net_admin+ep target/debug/serviceberry-gui`
+5. Give the binary Wifi capability permissions `sudo setcap cap_net_admin+ep target/debug/serviceberry-gui` -- you may need to run as root if this doesn't work
 6. Watch logs for sucessful location
 
 ## Contributing
