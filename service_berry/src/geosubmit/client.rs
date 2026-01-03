@@ -1,30 +1,32 @@
 //! HTTP client for submitting geosubmit payloads
 
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use reqwest_tracing::TracingMiddleware;
 use tracing::debug;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Instant;
 
 use crate::config::{APP_USER_AGENT, GEOSUBMIT_ENDPOINT};
-use crate::scanner::{bluetooth, wifi};
 use crate::error::{Error, Result};
+use crate::scanner::{bluetooth, wifi};
 
-use super::payload::{items, GeosubmitRequest};
+use super::payload::{GeosubmitRequest, items};
 
 /// Assemble geolocation payload from current scans
 pub async fn assemble_geo_payload(
     position: serde_json::Value,
     cell_towers: Option<serde_json::Value>,
 ) -> Result<items> {
-    let position: crate::geosubmit::payload::Position = serde_json::from_value(position)
-        .map_err(|e| Error::Serialization(e.to_string()))?;
+    let config = crate::config::get_config();
+
+    let position: crate::geosubmit::payload::Position =
+        serde_json::from_value(position).map_err(|e| Error::Serialization(e.to_string()))?;
 
     let cell_towers: Option<Vec<crate::geosubmit::payload::CellTower>> = match cell_towers {
         Some(ct_value) => Some(
-            serde_json::from_value(ct_value)
-                .map_err(|e| Error::Serialization(e.to_string()))?,
+            serde_json::from_value(ct_value).map_err(|e| Error::Serialization(e.to_string()))?,
         ),
         None => None,
     };
@@ -34,11 +36,16 @@ pub async fn assemble_geo_payload(
     let wifi_start = Instant::now();
     let ble_start = Instant::now();
 
-    let (wifi, ble) = tokio::join!(
+    let ifindex = config.interface.index;
+
+    let (wifi_result, ble) = tokio::join!(
         // run simultaneously
-        wifi::fetch_wifi_stats(),
+        wifi::scan(ifindex),
         bluetooth::fetch_ble_devices()
     );
+
+    let wifi = wifi_result.map_err(|e| Error::WifiScan(e.to_string()))?;
+
 
     let wifi_duration = wifi_start.elapsed();
     let ble_duration = ble_start.elapsed();
@@ -76,7 +83,10 @@ pub async fn submit_geo_payload(payload: items) -> Result<()> {
         items: vec![payload],
     };
 
-    debug!("Request JSON Body: {:?}", serde_json::to_string_pretty(&request_body).unwrap_or_default());
+    debug!(
+        "Request JSON Body: {:?}",
+        serde_json::to_string_pretty(&request_body).unwrap_or_default()
+    );
 
     let client: ClientWithMiddleware = ClientBuilder::new(https_client.clone())
         .with(TracingMiddleware::default())

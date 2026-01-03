@@ -94,3 +94,24 @@ impl IntoResponse for Error {
         (status, body).into_response()
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterfaceErrorKind {
+    NotFound,
+    InvalidName,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceError {
+    pub kind: InterfaceErrorKind,
+    pub message: String,
+}
+
+impl std::fmt::Display for InterfaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+
+impl std::error::Error for InterfaceError {}
