@@ -1,15 +1,21 @@
 use serde_json::Value;
+use service_berry::config::{self, Config, ConfigArgs};
+use service_berry::scanner::wifi::{fetch_wifi_interfaces, scan};
 
 #[tauri::command]
 pub async fn list_wifi() -> Result<Value, String> {
-    let res = service_berry::scanner::wifi::fetch_wifi_stats().await;
+    let temp_cfg: ConfigArgs = ConfigArgs::parse_args();
+    let cfg = temp_cfg
+        .resolve()
+        .map_err(|e| format!("Failed to resolve config: {e:?}"))?;
+    
+    let res = scan(cfg.interface.index).await.map_err(|e| e.to_string())?;
     serde_json::to_value(&res).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn list_adapters() -> Result<Value, String> {
-    let interfaces =
-        service_berry::scanner::wifi::fetch_wifi_interfaces().map_err(|e| e.to_string())?;
+    let interfaces = fetch_wifi_interfaces().map_err(|e| e.to_string())?;
     let names: Vec<String> = interfaces
         .into_iter()
         .filter_map(|iface| iface.name.map(|n| String::from_utf8_lossy(&n).to_string()))
@@ -62,18 +68,14 @@ pub async fn submit_geo(position: Value, cell_towers: Option<Value>) -> Result<S
 }
 
 pub async fn run_backend() -> Result<(), String> {
-    let cfg = service_berry::config::Config {
-        wifi_adapter: "wlan0".to_string(),
-        http_server_port: service_berry::config::HTTP_SERVER_PORT,
-        https_server_port: service_berry::config::HTTPS_SERVER_PORT,
-        scan_duration_secs: service_berry::config::SCAN_DURATION_SECS,
-        dwell_time: service_berry::config::DWELL_TIME,
-        geosubmit_endpoint: service_berry::config::GEOSUBMIT_ENDPOINT.to_string(),
-        user_agent: service_berry::config::APP_USER_AGENT.to_string(),
-        directory: service_berry::config::Config::get_config_dir(),
-    };
+    let temp_cfg: ConfigArgs = ConfigArgs::parse_args();
+    let cfg = temp_cfg
+        .resolve()
+        .map_err(|e| format!("Failed to resolve config: {e:?}"))?;
 
-    service_berry::run(cfg).await.map_err(|e| e.to_string())
+    service_berry::run(cfg.clone())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -7,8 +7,8 @@ export let band: "2.4GHz" | "5GHz" = "2.4GHz";
 
 // filter networks by band and sort by signal strength
 $: filteredNetworks = networks
-	.filter((n) => n.channel && getChannelBand(n.channel) === band)
-	.sort((a, b) => (b.rssi ?? -100) - (a.rssi ?? -100));
+	.filter((n) => n.channel_info.channel && getChannelBand(n.channel_info.channel) === band)
+	.sort((a, b) => (b.signalStrength ?? -100) - (a.signalStrength ?? -100));
 
 // cahart dimensions
 const width = 800;
@@ -51,7 +51,7 @@ $: {
 	const baseMax = channelConfig.max;
 	if (band === "5GHz" && filteredNetworks.length > 0) {
 		const channels = filteredNetworks
-			.map((n) => n.channel)
+			.map((n) => n.channel_info.channel)
 			.filter((c): c is number => typeof c === "number");
 		if (channels.length) {
 			const dataMin = Math.min(...channels);
@@ -103,9 +103,9 @@ function scaleY(rssi: number): number {
 function computeNetworkOffsets(networks: WifiEntry[]): Map<string, number> {
 	const channelGroups: Record<number, WifiEntry[]> = {};
 	networks.forEach((n) => {
-		if (!n.channel) return;
-		channelGroups[n.channel] = channelGroups[n.channel] || [];
-		channelGroups[n.channel].push(n);
+		if (!n.channel_info.channel) return;
+		channelGroups[n.channel_info.channel] = channelGroups[n.channel_info.channel] || [];
+		channelGroups[n.channel_info.channel].push(n);
 	});
 
 	const offsets = new Map<string, number>();
@@ -122,13 +122,13 @@ $: networkOffsets = computeNetworkOffsets(filteredNetworks);
 
 // Generate curve path for a network
 function generateCurvePath(network: WifiEntry): string {
-	if (!network.channel || !network.rssi) return "";
+	if (!network.channel_info.channel || !network.signalStrength) return "";
 
-	const centerChannel = network.channel;
-	const peakRssi = network.rssi;
+	const centerChannel = network.channel_info.channel;
+	const peakRssi = network.signalStrength;
 
 	// bandwithf determines curve width (in channels)
-	const bwMHz = network.bandwidth || (band === "2.4GHz" ? 20 : 40);
+	const bwMHz = network.channel_info.bandwidth_mhz || (band === "2.4GHz" ? 20 : 40);
 	const channelWidth = band === "2.4GHz" ? bwMHz / 5 : bwMHz / 10;
 	const sigma = Math.max(
 		0.5,
@@ -306,7 +306,7 @@ function getColor(index: number): string {
 				{#each [...filteredNetworks].reverse() as network, idx}
 					{@const i = filteredNetworks.length - 1 - idx}
 					{@const color = getColor(i)}
-					{#if network.channel && network.rssi}
+					{#if network.channel_info.channel && network.signalStrength}
 						<path
 							d={generateCurvePath(network)}
 							fill="url(#gradient-{i})"
@@ -319,13 +319,13 @@ function getColor(index: number): string {
 				{/each}
 
 				{#each filteredNetworks as network, i (network.bssid)}
-					{#if network.channel && network.rssi}
+					{#if network.channel_info.channel && network.signalStrength}
 						{@const labelX = Math.min(
 							width - padding.right + 4,
-							Math.max(padding.left - 4, scaleX(network.channel))
+							Math.max(padding.left - 4, scaleX(network.channel_info.channel))
 						)}
 						{@const labelY =
-							scaleY(network.rssi) -
+							scaleY(network.signalStrength) -
 							8 -
 							(networkOffsets.get(network.bssid) || 0)}
 						{@const displayName = (
@@ -389,7 +389,7 @@ function getColor(index: number): string {
 								16
 							)}</span
 						>
-						<span class="legend-rssi">{network.rssi} dBm</span>
+						<span class="legend-rssi">{network.signalStrength} dBm</span>
 					</div>
 				{/each}
 				{#if filteredNetworks.length > 8}

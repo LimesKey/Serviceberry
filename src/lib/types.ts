@@ -1,11 +1,22 @@
 export type WifiEntry = {
   ssid: string | null;
-  bssid: string;
-  rssi: number;
-  channel: number | null;
-  security: string; // formatted security string (WPA2-PSK, Open, etc.)
-  lastSeen?: number; // timestamp in ms
-  bandwidth?: number; // in MHz, optional
+  bssid: string; // MAC address as string
+  age?: number; // ms, optional
+  channel_info: {
+    frequency_mhz: number;
+    channel: number | null;
+    bandwidth_mhz?: number;
+  };
+  radioType: string[]; // array of PHY type strings
+  signalStrength: number;
+  wifi_security: {
+    version: string | null;
+    group_cipher?: string | null;
+    pairwise_ciphers?: string[];
+    auth_suites?: string[];
+    mfp?: string | null;
+  };
+  capabilities?: string[];
 };
 
 export type BtEntry = {

@@ -79,22 +79,60 @@ function formatSecurity(security: any): string {
 
 function normalizeWifi(res: any[]): WifiEntry[] {
 	const now = Date.now();
-	const incoming = (res ?? []).map((w) => ({
-		ssid: (w.ssid ?? "").trim() || null,
-		bssid: w.macAddress ?? w.bssid ?? "unknown",
-		rssi:
-			typeof w.signalStrength === "number"
-				? w.signalStrength
-				: (w.rssi ?? -999),
-		channel: w.channel ?? null,
-		security: formatSecurity(w.security),
-		lastSeen: now,
-	}));
+	const incoming = (res ?? []).map((w) => {
+		// Map backend fields to WifiEntry
+		const ssid = (w.ssid ?? "").trim() || null;
+		const bssid = w.macAddress ?? w.bssid ?? "unknown";
+		const rssi = typeof w.signalStrength === "number" ? w.signalStrength : (w.rssi ?? -999);
+		const channel = w.channel ?? null;
+		const channel_info = w.channel_info ?? null;
+		const radioType = w.radioType ?? w.radio_type ?? null;
+		const signalStrength = typeof w.signalStrength === "number" ? w.signalStrength : (w.rssi ?? -999);
+		const wifi_security = w.wifi_security ?? w.security ?? null;
+		const security = formatSecurity(w.security ?? w.wifi_security);
+		const lastSeen = now;
+		const seen = Array.isArray(w.seen) ? w.seen : [];
+		const vendor = w.vendor ?? null;
+		const country = w.country ?? null;
+		const information_elements = w.information_elements ?? [];
+		const capabilities = w.capabilities ?? null;
+		const frequency = w.frequency ?? null;
+		const width = w.width ?? null;
+		const center_freq1 = w.center_freq1 ?? null;
+		const center_freq2 = w.center_freq2 ?? null;
+		const beacon_interval = w.beacon_interval ?? null;
+		const tsf = w.tsf ?? null;
+		const ie = w.ie ?? null;
+		const raw = w.raw ?? null;
+		return {
+			ssid,
+			bssid,
+			rssi,
+			channel,
+			channel_info,
+			radioType,
+			signalStrength,
+			wifi_security,
+			security,
+			lastSeen,
+			seen,
+			vendor,
+			country,
+			information_elements,
+			capabilities,
+			frequency,
+			width,
+			center_freq1,
+			center_freq2,
+			beacon_interval,
+			tsf,
+			ie,
+			raw,
+		};
+	});
 	const map = new Map(wifiResults.map((w) => [w.bssid, w]));
 	for (const w of incoming) map.set(w.bssid, w);
-	return Array.from(map.values()).sort((a, b) =>
-		a.bssid.localeCompare(b.bssid)
-	);
+	return Array.from(map.values()).sort((a, b) => a.bssid.localeCompare(b.bssid));
 }
 
 function normalizeBt(res: any[]): BtEntry[] {

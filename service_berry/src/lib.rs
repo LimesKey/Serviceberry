@@ -11,7 +11,8 @@ pub mod scanner {
     pub mod wifi;
 
     pub use self::bluetooth::BleDevice;
-    pub use self::wifi::WifiBssid;
+    pub use self::wifi::types::WifiBssid;
+    pub use self::wifi::scan;
 }
 
 pub mod geosubmit {
@@ -92,7 +93,7 @@ pub mod server {
 
         tls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
 
-        debug!("HTTPS TLS configuration initialized");
+        debug!("HTTPS TLS configuration get_configialized");
 
         let acceptor = TlsAcceptor::from(Arc::new(tls_config));
         let listener = TcpListener::bind(("0.0.0.0", port))
@@ -168,6 +169,12 @@ pub async fn run(config: config::Config) -> crate::error::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
 
+    // Initialize global config
+    let http_port = config.http_server_port;
+    let https_port = config.https_server_port;
+    let directory = config.directory.clone();
+    config::init_config(config);
+
     // get system info
     let hostname = hostname::get() // computer/device name, e.g: "My-MacBook"
         .unwrap_or_else(|_| "unknown-device-hostname".into())
@@ -189,7 +196,7 @@ pub async fn run(config: config::Config) -> crate::error::Result<()> {
     info!("Starting ServiceBerry v{} on {}", version, hostname);
 
     // Generate TLS certificates
-    let identity = config::load_identity(&mdns_hostname, &config.directory)
+    let identity = config::load_identity(&mdns_hostname, &directory)
         .map_err(|e| crate::error::Error::Other(e.to_string()))?;
 
     // Register mDNS service
@@ -215,15 +222,14 @@ pub async fn run(config: config::Config) -> crate::error::Result<()> {
     });
 
     tokio::spawn({
-        let cfg = config.clone();
         async move {
-            if let Err(e) = server::start_http(cfg.http_server_port).await {
+            if let Err(e) = server::start_http(http_port).await {
                 tracing::error!("HTTP server error: {:?}", e);
             }
         }
     });
 
-    server::start_https(identity, config.https_server_port).await?;
+    server::start_https(identity, https_port).await?;
     Ok(())
 }
 
