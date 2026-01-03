@@ -2577,7 +2577,6 @@ dependencies = [
  "libc",
  "log",
  "neli-proc-macros 0.1.4",
- "tokio",
 ]
 
 [[package]]
@@ -2625,11 +2624,10 @@ dependencies = [
 [[package]]
 name = "neli-wifi"
 version = "0.6.1"
+source = "git+https://github.com/LimesKey/neli-wifi#2c921b25ddd93b0cce4968164aad3adc34cd06ca"
 dependencies = [
  "neli 0.6.5",
  "neli-proc-macros 0.1.4",
- "neli-wifi",
- "tokio",
 ]
 
 [[package]]
